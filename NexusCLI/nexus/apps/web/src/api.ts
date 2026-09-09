@@ -3,6 +3,8 @@ import type {
   DiffResponse,
   HealthResponse,
   ModelsResponse,
+  ProbeRequest,
+  ProbeResponse,
   Project,
   ProjectDetail,
   ProjectPatch,
@@ -30,8 +32,8 @@ async function request<T>(route: string, method = "GET", payload?: unknown): Pro
 export const api = {
   health: () => request<HealthResponse>("/health"),
   models: () => request<ModelsResponse>("/models"),
-  probe: (baseUrl: string, apiKeyEnv?: string) =>
-    request<{ models: string[] }>("/models/probe", "POST", { baseUrl, apiKeyEnv }),
+  discover: (input: ProbeRequest) => request<ProbeResponse>("/models/discover", "POST", input),
+  probe: (input: ProbeRequest) => request<ProbeResponse>("/models/probe", "POST", input),
   projects: () => request<Project[]>("/projects"),
   addProject: (path: string) => request<ProjectDetail>("/projects", "POST", { path }),
   project: (id: string) => request<ProjectDetail>(`/projects/${id}`),

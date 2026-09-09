@@ -4,6 +4,7 @@ import { homedir } from "node:os"
 import { parseArgs } from "node:util"
 import { mkdir } from "node:fs/promises"
 import { createNexus } from "../../src/composition"
+import { OpenAICompatibleProvider } from "../../src/llm/openai-compatible"
 import { loadConfig } from "../../src/config/config"
 import type { Provider, Store } from "../../src/domain/ports"
 import { errorText } from "../../src/shared/errors"
@@ -33,7 +34,7 @@ export async function createNexusServer(options: {
   const runs = new RunManager(registry, config.model)
   const api = await createNexus({
     dataDir: options.dataDir,
-    provider: options.provider,
+    provider: options.provider ?? new OpenAICompatibleProvider(options.env ?? process.env),
     store: options.store,
     // Nothing is pre-approved globally; per-project allowChecks is answered by the bridge.
     rules: {},

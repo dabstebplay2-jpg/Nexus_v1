@@ -319,3 +319,34 @@ details.patch pre {
   color: var(--muted);
   font-size: 12px;
 }
+.model-config {
+  flex: 1;
+  min-width: 0;
+}
+.model-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.model-controls .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.model-controls .endpoint-field {
+  flex: 1;
+  min-width: 260px;
+}
+.model-controls select {
+  max-width: 320px;
+}
+.model-status {
+  padding: 8px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.manual-model {
+  font-size: 12px;
+  align-self: center;
+}

@@ -33,6 +33,7 @@ export function App() {
   const [report, setReport] = useState<RunReport>()
   const [epoch, setEpoch] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [modelPending, setModelPending] = useState(false)
   const [error, setError] = useState("")
 
   const guard = useCallback(async (work: () => Promise<void>) => {
@@ -155,14 +156,16 @@ export function App() {
           NEXUS<span>v{health?.version ?? "0.2.0"} · evidence before completion</span>
         </span>
         <ModelBar
+          onPending={setModelPending}
+          key={detail?.id ?? "loading"}
           models={models}
           settings={detail?.settings}
           disabled={busy || Boolean(run?.running) || !detail}
-          onSave={saveSettings}
-          onProbe={async () => {
-            if (!detail) return []
-            const probed = await api.probe(detail.settings.baseUrl, detail.settings.apiKeyEnv)
-            return probed.models
+          onSave={async (patch) => {
+            if (!projectId) throw new Error("Select a project first")
+            const saved = await api.saveProject(projectId, patch)
+            setDetail(saved)
+            return saved.settings
           }}
         />
         <span className="spacer" />
@@ -199,7 +202,7 @@ export function App() {
           run={run}
           events={events}
           report={report}
-          disabled={busy || !detail?.available}
+          disabled={busy || modelPending || !detail?.available}
           onStart={start}
           onPrompt={(text, delivery) =>
             void guard(async () => {
