@@ -19,8 +19,8 @@ import { PermissionEngine, type Rules } from "./permissions/engine"
 import { ToolRegistry, defineTool } from "./tools/registry"
 import { builtinTools } from "./tools/builtin"
 import { ToolExecutor } from "./tools/executor"
-import { fingerprint } from "./tools/workspace"
 import { VerificationEngine } from "./verification/engine"
+import { inventory, inventoryFingerprint } from "./verification/delta"
 import { verificationAssets } from "./verification/integrity"
 import { planSchema, revisePlan } from "./planner/plan"
 import { NexusError } from "./shared/errors"
@@ -92,7 +92,8 @@ export async function createNexus(options: {
         workspace,
         contract.checks.map((check) => check.argv),
       )
-      contract.baselineFingerprint = await fingerprint(workspace)
+      contract.generatedPaths = []
+      contract.baselineFingerprint = inventoryFingerprint(await inventory(workspace))
       const session: AgentSession = {
         id: crypto.randomUUID(),
         workspace,
@@ -162,7 +163,7 @@ export async function createNexus(options: {
           actual: redact(note),
           verdict: "pass",
           metadata: { manual: true },
-          fingerprint: await fingerprint(session.workspace),
+          fingerprint: inventoryFingerprint(await inventory(session.workspace, session.contract.generatedPaths ?? [])),
           contractRevision: session.contract.revision,
         })
       } finally {

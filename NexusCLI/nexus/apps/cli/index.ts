@@ -8,6 +8,7 @@ import { loadConfig, configSchema } from "../../src/config/config"
 import { safeJson } from "../../src/shared/redact"
 import { errorText, NexusError } from "../../src/shared/errors"
 import { terminal, render } from "./terminal"
+import { report } from "./report"
 
 async function main() {
   const args = parseArgs({
@@ -32,6 +33,7 @@ nexus steer <id> "instruction" | queue <id> "task"
 nexus assert-goal <id> "scenario personally checked"
 nexus resolve-action <id> <action-id> VERIFIED|FAILED "inspection note"
 nexus trust-checks <id> "review note for changed test harness"
+Exit codes: 0 proved complete, 2 not complete, 3 UNKNOWN (could not be proved either way)
 Options: --answer (informational only), --allow-checks (trust project checks), --debug, --data-dir path
 While running: plain text or /steer changes direction; /queue admits the next task. Ctrl+C cancels.
 Shell commands require approval and execute with your OS privileges.`)
@@ -161,17 +163,10 @@ Shell commands require approval and execute with your OS privileges.`)
     process.on("SIGINT", interrupt)
     try {
       const result = await api.run(id, cancellation.signal)
-      console.log(
-        `\n${result.status === "COMPLETED" ? "DONE" : result.status} — ${result.decision?.reason ?? "Stopped"}\nSession: ${id}`,
-      )
-      const last = result.conversation.findLast((message) => message.role === "assistant" && !message.toolCalls?.length)
-      if (last?.content)
-        console.log(`\n${result.status === "COMPLETED" ? "Result" : "Model proposal (unverified)"}:\n${last.content}`)
-      if (result.decision?.outcome === "NEEDS_USER_INPUT")
-        console.log(
-          `After checking the original scenario: nexus assert-goal ${id} "what you checked"; then nexus resume ${id}`,
-        )
-      if (result.status !== "COMPLETED") process.exitCode = 2
+      console.log(report(api, id, result))
+      // UNKNOWN is a distinct answer from failure, so it gets its own exit code.
+      if (result.status === "UNKNOWN") process.exitCode = 3
+      else if (result.status !== "COMPLETED") process.exitCode = 2
     } finally {
       process.removeListener("SIGINT", interrupt)
     }

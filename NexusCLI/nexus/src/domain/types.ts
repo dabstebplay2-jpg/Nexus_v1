@@ -9,6 +9,7 @@ export type Status =
   | "WAITING_PERMISSION"
   | "COMPLETED"
   | "FAILED"
+  | "UNKNOWN"
   | "ABORTED"
 export type Capability =
   | "READ"
@@ -95,6 +96,8 @@ export type Contract = {
   checks: Check[]
   protectedFiles?: Record<string, string>
   baselineFingerprint?: string
+  /** Paths and directory prefixes a trusted check was observed to generate. Learned, never hardcoded. */
+  generatedPaths?: string[]
 }
 export type Project = { kind: string; packageManager?: string; roots: string[]; checks: Check[] }
 export type GitBaseline = {
@@ -173,7 +176,7 @@ export type Evidence = {
   contractRevision: number
 }
 export type Decision = {
-  outcome: "COMPLETE" | "INCOMPLETE" | "BLOCKED" | "NEEDS_VERIFICATION" | "NEEDS_USER_INPUT"
+  outcome: "COMPLETE" | "INCOMPLETE" | "BLOCKED" | "NEEDS_VERIFICATION" | "NEEDS_USER_INPUT" | "UNKNOWN"
   reason: string
   missing: string[]
 }
@@ -202,6 +205,7 @@ export type Turn = {
   number: number
   status: "STARTED" | "SUCCEEDED" | "FAILED" | "UNKNOWN"
   contextChars: number
+  contextTokens: number
   model: string
   error?: string
 }
