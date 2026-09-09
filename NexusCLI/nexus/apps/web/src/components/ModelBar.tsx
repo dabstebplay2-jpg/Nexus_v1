@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import type { ModelsResponse, ProbeResponse, ProjectPatch, ProjectSettings, RunMode } from "../../../shared/protocol"
 import { api } from "../api"
 
+const modelLabel = (id: string) => (/^(?:[A-Za-z]:[\\/]|\/)/.test(id) ? id.split(/[\\/]/).at(-1) || id : id)
+
 /** Commit edits together before diagnosis; partial input never becomes run configuration. */
 export function ModelBar(props: {
   models?: ModelsResponse
@@ -120,6 +122,19 @@ export function ModelBar(props: {
           Discover models
         </button>
         <div className="field">
+          <label htmlFor="context-length">Context tokens</label>
+          <input
+            id="context-length"
+            type="number"
+            min="4096"
+            step="1024"
+            value={settings.contextLength}
+            disabled={disabled}
+            onChange={(event) => edit({ contextLength: Number(event.target.value) })}
+            title="Use the context window configured in your backend"
+          />
+        </div>
+        <div className="field">
           <label htmlFor="model">Model</label>
           {manual ? (
             <input
@@ -136,11 +151,13 @@ export function ModelBar(props: {
               onChange={(event) => edit({ model: event.target.value })}
             >
               {!discovered.includes(settings.model) && (
-                <option value={settings.model}>{settings.model} (saved; not discovered)</option>
+                <option value={settings.model} title={settings.model}>
+                  {modelLabel(settings.model)} (saved; not discovered)
+                </option>
               )}
               {discovered.map((id) => (
-                <option key={id} value={id}>
-                  {id}
+                <option key={id} value={id} title={id}>
+                  {modelLabel(id)}
                 </option>
               ))}
             </select>

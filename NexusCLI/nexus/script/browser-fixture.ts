@@ -20,10 +20,13 @@ const backend = Bun.serve({
     if (route.startsWith("/unsupported") && route.endsWith("/models")) return new Response(null, { status: 404 })
     if (route.endsWith("/models"))
       return Response.json({ data: [{ id: "fixture-model-a" }, { id: "fixture-model-b" }] })
-    const payload = (await request.json()) as { stream: boolean }
+    const payload = (await request.json()) as { stream: boolean; messages?: { content?: string }[] }
     if (!payload.stream)
       return Response.json({ choices: [{ message: { role: "assistant", content: "OK" }, finish_reason: "stop" }] })
-    const broken = (await Bun.file(path.join(workspace, "add.ts")).text()).includes("a - b")
+    const informational = payload.messages?.some((message) =>
+      message.content?.includes("informational connection test"),
+    )
+    const broken = !informational && (await Bun.file(path.join(workspace, "add.ts")).text()).includes("a - b")
     const delta = broken
       ? {
           tool_calls: [
@@ -42,7 +45,7 @@ const backend = Bun.serve({
             },
           ],
         }
-      : { content: "Addition is corrected and checked." }
+      : { content: informational ? "NEXUS_LOCAL_OK" : "Addition is corrected and checked." }
     return new Response(
       `data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason: broken ? "tool_calls" : "stop" }] })}\n\ndata: [DONE]\n\n`,
       { headers: { "Content-Type": "text/event-stream" } },

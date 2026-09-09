@@ -36,6 +36,16 @@ test("discover, select, Probe, reload and run a task through browser SSE", async
   expect((await stream).headers()["content-type"]).toContain("text/event-stream")
   await expect(page.locator(".log")).toContainText("finished", { timeout: 110000 })
   const report = await (await request.get(`/api/runs/${run.id}/report`)).json()
+  console.log(
+    JSON.stringify({
+      backend: info.realBackend ? "REAL" : "FAKE",
+      runId: run.id,
+      status: report.status,
+      turns: report.turns,
+      toolCount: report.toolCount,
+      decision: report.decision,
+    }),
+  )
   expect(report.status).toBe("COMPLETED")
   expect(report.proposal?.text.length).toBeGreaterThan(0)
   expect(report.changes.files.some((file: { path: string }) => file.path === "add.ts")).toBe(true)
@@ -53,6 +63,72 @@ test("discover, select, Probe, reload and run a task through browser SSE", async
       proposal: report.proposal,
     }),
   )
+})
+
+test("informational task returns a final LLM answer through browser EventSource", async ({ page, request }) => {
+  const info = await (await request.get("/__fixture")).json()
+  await page.goto("/")
+  await page.getByRole("button", { name: "Discover models" }).click()
+  await expect(page.getByRole("status")).toContainText("Models discovered")
+  const choices = await page
+    .locator("#model option")
+    .evaluateAll((options) =>
+      options.map((option) => ({ value: (option as HTMLOptionElement).value, text: option.textContent })),
+    )
+  await page
+    .getByLabel("Model", { exact: true })
+    .selectOption(choices.find((option) => !option.text?.includes("not discovered"))!.value)
+  await page.getByRole("button", { name: "Probe", exact: true }).click()
+  await expect(page.getByRole("status")).toContainText("Connected", { timeout: 70000 })
+  const events = await page.evaluate(async () => {
+    const projects = await (await fetch("/api/projects")).json()
+    const run = await (
+      await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: projects[0].id,
+          answerOnly: true,
+          goal: "This is an informational connection test. Do not use any tools. Do not inspect or change files. Reply with exactly NEXUS_LOCAL_OK as your final answer.",
+        }),
+      })
+    ).json()
+    return await new Promise<{ id: string; types: string[] }>((resolve, reject) => {
+      const stream = new EventSource(`/api/runs/${run.id}/events`)
+      const types: string[] = []
+      const timeout = setTimeout(() => {
+        stream.close()
+        reject(new Error("SSE timed out"))
+      }, 100000)
+      stream.onmessage = (message) => {
+        const event = JSON.parse(message.data)
+        types.push(event.type)
+        if (event.type === "run_finished") {
+          clearTimeout(timeout)
+          stream.close()
+          resolve({ id: run.id, types })
+        }
+      }
+      stream.onerror = () => {
+        clearTimeout(timeout)
+        stream.close()
+        reject(new Error("SSE failed"))
+      }
+    })
+  })
+  const report = await (await request.get(`/api/runs/${events.id}/report`)).json()
+  console.log(
+    JSON.stringify({
+      backend: info.realBackend ? "REAL" : "FAKE",
+      ...events,
+      status: report.status,
+      turns: report.turns,
+      proposal: report.proposal,
+    }),
+  )
+  expect(events.types).toContain("run_finished")
+  expect(report.status).toBe("COMPLETED")
+  expect(report.proposal?.text.length).toBeGreaterThan(0)
 })
 
 test("endpoint edits clear connected status and unsupported discovery exposes manual input", async ({

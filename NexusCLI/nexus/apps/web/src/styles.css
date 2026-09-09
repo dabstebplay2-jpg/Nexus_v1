@@ -322,6 +322,15 @@ details.patch pre {
 .model-config {
   flex: 1;
   min-width: 0;
+  flex-basis: 100%;
+  order: 3;
+}
+.topbar {
+  flex-wrap: wrap;
+}
+.manual-model input {
+  width: auto;
+  min-width: 0;
 }
 .model-controls {
   display: flex;

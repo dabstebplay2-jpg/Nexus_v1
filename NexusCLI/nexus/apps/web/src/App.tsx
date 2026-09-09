@@ -157,14 +157,14 @@ export function App() {
         </span>
         <ModelBar
           onPending={setModelPending}
-          key={detail?.id ?? "loading"}
+          key={projectId ?? "loading"}
           models={models}
-          settings={detail?.settings}
+          settings={detail?.id === projectId ? detail?.settings : undefined}
           disabled={busy || Boolean(run?.running) || !detail}
           onSave={async (patch) => {
             if (!projectId) throw new Error("Select a project first")
             const saved = await api.saveProject(projectId, patch)
-            setDetail(saved)
+            setDetail((current) => (current?.id === saved.id ? saved : current))
             return saved.settings
           }}
         />

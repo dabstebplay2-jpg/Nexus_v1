@@ -82,14 +82,19 @@ test("local preset URLs are explicit and Unsloth does not inherit LM Studio", ()
 
 test("missing model and malformed input are diagnostic states", async () => {
   const f = await fixture()
-  expect(await (await f.call("/models/probe", { ...f.input, model: "" })).json()).toMatchObject({ ok: false, stage: "model" })
+  expect(await (await f.call("/models/probe", { ...f.input, model: "" })).json()).toMatchObject({
+    ok: false,
+    stage: "model",
+  })
   expect(await (await f.call("/models/probe", null)).json()).toMatchObject({ ok: false, stage: "config" })
 })
 
 test("chat HTTP errors retain their upstream status without exposing backend text", async () => {
-  const f = await fixture(request => new URL(request.url).pathname.endsWith("/models")
-    ? Response.json({ data: [{ id: "model-a" }] })
-    : new Response("private-value-no-standard-prefix", { status: 400 }))
+  const f = await fixture((request) =>
+    new URL(request.url).pathname.endsWith("/models")
+      ? Response.json({ data: [{ id: "model-a" }] })
+      : new Response("private-value-no-standard-prefix", { status: 400 }),
+  )
   const response = await f.call("/models/probe", f.input)
   expect(response.status).toBe(200)
   const result = await response.json()
@@ -99,9 +104,11 @@ test("chat HTTP errors retain their upstream status without exposing backend tex
 
 test("failed task transport never leaks the configured key through Core SSE", async () => {
   const f = await fixture(() => new Response("private-value-no-standard-prefix", { status: 401 }))
-  const project = await (await f.call("/projects", { path: f.workspace })).json() as ProjectDetail
+  const project = (await (await f.call("/projects", { path: f.workspace })).json()) as ProjectDetail
   await f.call(`/projects/${project.id}`, f.input, "PATCH")
-  const run = await (await f.call("/runs", { projectId: project.id, goal: "Answer", answerOnly: true })).json() as RunSummary
+  const run = (await (
+    await f.call("/runs", { projectId: project.id, goal: "Answer", answerOnly: true })
+  ).json()) as RunSummary
   const stream = await (await f.call(`/runs/${run.id}/events`, undefined, "GET")).text()
   expect(stream).toContain("HTTP_401")
   expect(stream).not.toContain(f.env.LOCAL_TEST_KEY)
