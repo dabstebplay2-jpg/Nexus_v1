@@ -55,6 +55,32 @@ Probe validates model membership when discovery is available, then sends a
 32-token non-streaming Chat Completions request and checks for assistant text.
 This proves basic inference, not tool-calling quality or task completion.
 
+The Web form saves one validated configuration before Discover/Probe. A discovered
+ID is selected with a dropdown, with explicit manual input available. Any edit
+invalidates the displayed connection status. Unsaved edits and in-flight checks
+disable task submission. Reload restores saved settings but does not falsely
+restore a previous Connected status.
+
+The existing HTTP provider adapter now accepts an environment map (defaulting to
+the real process environment). This small infrastructure change fixes an observed
+dependency-injection mismatch: server diagnostics previously used `options.env`,
+while task inference always read `process.env`. Both now receive the same map.
+Raw backend errors are scrubbed of that exact key before entering Core events.
+Agent Core, completion, verification and domain remain unchanged.
+
+## Web tooling
+
+The browser tsconfig already had no `extends`. The warning came from Vite's
+esbuild configuration bundler traversing the surrounding upstream tsconfig.
+Using Vite's module runner for dev/build/preview isolates config loading without
+editing the upstream snapshot or importing Bun types into the browser.
+
+`npm audit` identified Vite 7.1.3 as the one high-severity dependency, including
+development-server file-read / filesystem-deny bypass advisories. Updated within
+major 7 to 7.3.6; audit then reported zero vulnerabilities. No force upgrade.
+The dev server has the exposure; production uses the built static assets served
+by the Nexus HTTP server. Playwright is a development-only regression dependency.
+
 For Unsloth use its Studio API address (observed `http://127.0.0.1:8888/v1`),
 not its private changing llama-server port. Start Studio, load a model and enable
 its API access. If it requires a key, set `UNSLOTH_API_KEY` in the environment
