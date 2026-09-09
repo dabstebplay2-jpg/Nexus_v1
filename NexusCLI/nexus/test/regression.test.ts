@@ -6,6 +6,7 @@ import { modelSchema } from "../src/config/config"
 import { safeJson } from "../src/shared/redact"
 import { runProcess } from "../src/tools/process"
 import { hashFile } from "../src/tools/workspace"
+import { report } from "../apps/cli/report"
 import { answer, brokenAdd, call, fixtureWith, goalCheck, model, plainScenario } from "./helpers"
 
 /** Read the decision outcome as an opaque string so these tests assert behaviour, never compile-time shape. */
@@ -280,5 +281,52 @@ describe("D5 intent becomes a contract, not a regex match", () => {
   test.each(informational)("%j does not claim a reproduction contract", (goal) => {
     const contract = createContract(goal, project, "coding")
     expect(contract.criteria.map((criterion) => criterion.id)).not.toContain("reproduction")
+  })
+})
+
+describe("Phase 5: the run report explains the outcome instead of dumping JSON", () => {
+  test("an UNKNOWN run names the changed file and the next step", async () => {
+    const f = await fixtureWith({ "add.ts": brokenAdd, "scenario.ts": sourceMutatingScenario }, () =>
+      answer("I believe this is fixed."),
+    )
+    try {
+      const session = await f.api.create({
+        workspace: f.workspace,
+        goal: "Fix addition",
+        model,
+        goalCheck,
+        budgets: { maxTurns: 6 },
+      })
+      const printed = report(f.api, session.id, await f.api.run(session.id))
+      for (const section of ["PLAN", "CHANGES", "VERIFICATION", "EVIDENCE", "RESULT"])
+        expect(printed).toContain(section)
+      expect(printed).toContain("UNKNOWN")
+      expect(printed).toContain("add.ts")
+      expect(printed).toContain("trust-checks")
+      expect(printed).not.toContain("MODEL PROPOSAL (UNVERIFIED)\n  {")
+    } finally {
+      await f.cleanup()
+    }
+  })
+
+  test("a proved run reports the reproduction and the fix separately", async () => {
+    const f = await fixtureWith({ "add.ts": brokenAdd, "scenario.ts": plainScenario }, async (_, turn) =>
+      turn === 1 ? await fixAdd(f.workspace) : answer("Corrected the operator."),
+    )
+    try {
+      const session = await f.api.create({
+        workspace: f.workspace,
+        goal: "Fix addition",
+        model,
+        goalCheck,
+        budgets: { maxTurns: 6 },
+      })
+      const printed = report(f.api, session.id, await f.api.run(session.id))
+      expect(printed).toContain("DONE")
+      expect(printed).toContain("add.ts  ")
+      expect(printed).toContain("+1")
+    } finally {
+      await f.cleanup()
+    }
   })
 })

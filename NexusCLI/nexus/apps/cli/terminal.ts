@@ -3,13 +3,31 @@ import type { Event, NexusAPI } from "../../src/api"
 import type { PermissionReply } from "../../src/domain/ports"
 import { safeJson, bound } from "../../src/shared/redact"
 
+const field = (data: unknown, key: string) =>
+  data && typeof data === "object" && key in data ? (data as Record<string, unknown>)[key] : undefined
+const text = (data: unknown, key: string) => {
+  const value = field(data, key)
+  return value === undefined || value === null ? "" : String(value)
+}
+
+/** Progress lines a human can follow. Raw event payloads stay behind --debug. */
 export function render(event: Event, debug: boolean) {
   if (debug) {
     console.log(safeJson(event))
     return
   }
-  if (["state", "tool", "completion", "error", "loop_guard", "permission", "created"].includes(event.type))
-    console.log(`[${event.type}] ${bound(safeJson(event.data), 1800).text}`)
+  const data = event.data
+  if (event.type === "created")
+    console.log(`Nexus · ${text(data, "project")} · ${text(data, "model")} · branch ${text(data, "branch")}`)
+  if (event.type === "state") {
+    const reason = text(data, "reason")
+    console.log(`→ ${text(data, "next")}${reason ? ` — ${reason}` : ""}`)
+  }
+  if (event.type === "tool") console.log(`  · ${text(data, "name")} → ${text(data, "status")}`)
+  if (event.type === "loop_guard") console.log(`  ! guard ${text(data, "action")} — ${text(data, "reason")}`)
+  if (event.type === "completion") console.log(`  = ${text(data, "outcome")} — ${text(data, "reason")}`)
+  if (event.type === "error") console.log(`  ✗ ${text(data, "code")}: ${text(data, "message")}`)
+  if (event.type === "permission") console.log(`  ? ${bound(safeJson(data), 400).text}`)
 }
 /** One stdin owner routes approvals and durable steer/queue input without racing readline prompts. */
 export function terminal() {
