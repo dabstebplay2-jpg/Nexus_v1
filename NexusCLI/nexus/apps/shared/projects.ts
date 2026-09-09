@@ -3,6 +3,7 @@ import { realpath, stat } from "node:fs/promises"
 import { z } from "zod"
 import { NexusError } from "../../src/shared/errors"
 import type { ProjectSettings } from "./protocol"
+import { endpointSchema, keyEnvSchema } from "./models"
 
 /**
  * Project registry — the foundation for project memory.
@@ -15,9 +16,9 @@ import type { ProjectSettings } from "./protocol"
  */
 const settingsSchema = z.object({
   presetId: z.string().min(1),
-  baseUrl: z.string().min(1),
+  baseUrl: endpointSchema,
   model: z.string().min(1),
-  apiKeyEnv: z.string().min(1),
+  apiKeyEnv: keyEnvSchema,
   contextLength: z.number().int().min(4096),
   mode: z.enum(["fast", "balanced", "deep"]),
   allowChecks: z.boolean(),

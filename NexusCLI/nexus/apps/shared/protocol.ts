@@ -109,8 +109,19 @@ export type ModeDescriptor = {
   maxDurationMs: number
 }
 export type ModelsResponse = { presets: ModelPreset[]; modes: ModeDescriptor[] }
-export type ProbeRequest = { baseUrl: string; apiKeyEnv?: string }
-export type ProbeResponse = { models: string[] }
+export type ProbeRequest = { baseUrl: string; apiKeyEnv?: string; presetId?: string; model?: string }
+export type ProbeResponse = {
+  ok: boolean
+  stage: "config" | "connect" | "discovery" | "model" | "chat" | "ready"
+  provider: string
+  baseUrl: string
+  statusCode?: number
+  message: string
+  suggestion: string
+  models: string[]
+  discovery: "available" | "unsupported" | "failed"
+  keyConfigured: boolean
+}
 export type HealthResponse = {
   name: string
   version: string

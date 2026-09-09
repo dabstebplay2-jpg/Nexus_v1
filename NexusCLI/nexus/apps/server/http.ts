@@ -4,7 +4,8 @@ import type { Check, ModelConfig, NexusAPI } from "../../src/api"
 import { detect } from "../../src/project/detect"
 import { gitBaseline } from "../../src/git/baseline"
 import { NexusError, errorText } from "../../src/shared/errors"
-import { defaultSettings, modeDescriptors, modelPresets } from "../shared/models"
+import { defaultSettings, endpointSchema, keyEnvSchema, modeDescriptors, modelPresets } from "../shared/models"
+import { diagnoseModel } from "./models"
 import { ProjectRegistry } from "../shared/projects"
 import type { CheckSummary, ProjectDetail, ProjectTask } from "../shared/protocol"
 import { RunManager } from "./runs"
@@ -33,9 +34,9 @@ const patchProject = z
   .object({
     name: z.string().min(1),
     presetId: z.string().min(1),
-    baseUrl: z.string().min(1),
+    baseUrl: endpointSchema,
     model: z.string().min(1),
-    apiKeyEnv: z.string().min(1),
+    apiKeyEnv: keyEnvSchema,
     contextLength: z.number().int().min(4096),
     mode: z.enum(["fast", "balanced", "deep"]),
     allowChecks: z.boolean(),
@@ -57,9 +58,6 @@ const resolveBody = z.object({
   outcome: z.enum(["VERIFIED", "FAILED"]),
   note: z.string().min(1),
 })
-const probeBody = z.object({ baseUrl: z.string().min(1), apiKeyEnv: z.string().min(1).optional() })
-
-const probeTimeoutMs = 8000
 const heartbeatMs = 15000
 const status: Record<string, number> = {
   INPUT: 400,
@@ -136,21 +134,6 @@ export function createRouter(deps: ServerDeps) {
       tasks,
       activeRunId: deps.runs.activeFor(id),
     }
-  }
-
-  /** Real probe against the endpoint the user configured. No hardcoded model catalogue. */
-  async function probe(baseUrl: string, apiKeyEnv?: string) {
-    const key = apiKeyEnv ? deps.env[apiKeyEnv] : undefined
-    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
-      headers: key ? { Authorization: `Bearer ${key}` } : {},
-      signal: AbortSignal.timeout(probeTimeoutMs),
-    })
-    if (!response.ok) throw new NexusError("CONFIG", `${baseUrl} answered ${response.status}`)
-    const parsed = z
-      .object({ data: z.array(z.object({ id: z.string() })) })
-      .safeParse(await response.json().catch(() => undefined))
-    if (!parsed.success) throw new NexusError("CONFIG", `${baseUrl} did not return an OpenAI-compatible model list`)
-    return { models: parsed.data.data.map((item) => item.id).sort() }
   }
 
   function stream(id: string, cursor: number, headers: Record<string, string>) {
@@ -230,9 +213,9 @@ export function createRouter(deps: ServerDeps) {
 
     if (parts.length === 2 && parts[1] === "models" && method === "GET")
       return json({ presets: modelPresets(deps.env), modes: modeDescriptors() }, headers)
-    if (parts.length === 3 && parts[1] === "models" && parts[2] === "probe" && method === "POST") {
-      const input = await body(request, probeBody)
-      return json(await probe(input.baseUrl, input.apiKeyEnv), headers)
+    if (parts.length === 3 && parts[1] === "models" && ["probe", "discover"].includes(parts[2]!) && method === "POST") {
+      const input: unknown = await request.json().catch(() => undefined)
+      return json(await diagnoseModel(input, deps.env, parts[2] === "probe"), headers)
     }
 
     if (parts.length === 2 && parts[1] === "projects") {

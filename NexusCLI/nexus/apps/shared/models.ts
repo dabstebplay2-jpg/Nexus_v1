@@ -1,5 +1,6 @@
 import type { Budgets, ModelConfig } from "../../src/domain/types"
 import { modelSchema } from "../../src/config/config"
+import { z } from "zod"
 import type { ModeDescriptor, ModelPreset, ProjectSettings, RunMode } from "./protocol"
 
 /**
@@ -13,6 +14,16 @@ import type { ModeDescriptor, ModelPreset, ProjectSettings, RunMode } from "./pr
 type Preset = Omit<ModelPreset, "keyConfigured">
 
 const presets: Preset[] = [
+  {
+    id: "unsloth",
+    label: "Unsloth Desktop (local)",
+    baseUrl: "http://127.0.0.1:8888/v1",
+    apiKeyEnv: "UNSLOTH_API_KEY",
+    suggestedModels: [],
+    requiresKey: false,
+    contextLength: 32768,
+    note: "Start Studio and load a model. Use its API URL, not the internal llama-server port. Set an API key on the Nexus server if Studio requires authentication.",
+  },
   {
     id: "openai",
     label: "OpenAI",
@@ -61,7 +72,7 @@ const presets: Preset[] = [
     suggestedModels: ["local-model"],
     requiresKey: false,
     contextLength: 32768,
-    note: "Local server started with llama-server --api-key-less OpenAI routes.",
+    note: "Start llama-server with a GGUF model and use its listening API URL. A key is optional unless the backend requires one.",
   },
   {
     id: "vllm",
@@ -84,6 +95,34 @@ const presets: Preset[] = [
     note: "Any openai-compatible server.",
   },
 ]
+
+/** Match the Core transport policy; an origin is a convenience shorthand for /v1. */
+export const endpointSchema = z
+  .string()
+  .trim()
+  .transform((input, ctx) => {
+    try {
+      const url = new URL(input)
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash)
+        throw new Error()
+      if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error()
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/v1"
+      return url.toString().replace(/\/+$/, "")
+    } catch {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Use an HTTP loopback or HTTPS API base URL without credentials, query or fragment (for example http://127.0.0.1:8888/v1).",
+      })
+      return z.NEVER
+    }
+  })
+
+/** Empty means no authentication. Only a variable name is persisted, never its value. */
+export const keyEnvSchema = z
+  .string()
+  .trim()
+  .regex(/^$|^[A-Za-z_][A-Za-z0-9_]*$/, "Enter an environment variable name, not an API key")
 
 /**
  * Modes are budgets, not labels. Each one changes how long the agent may work and how much it
@@ -152,7 +191,7 @@ export function defaultSettings(fallback: ModelConfig): ProjectSettings {
 export function modelConfigFor(settings: ProjectSettings, template: ModelConfig): ModelConfig {
   return modelSchema.parse({
     ...template,
-    baseUrl: settings.baseUrl,
+    baseUrl: endpointSchema.parse(settings.baseUrl),
     model: settings.model,
     apiKeyEnv: settings.apiKeyEnv,
     capabilities: { ...template.capabilities, contextLength: settings.contextLength },
