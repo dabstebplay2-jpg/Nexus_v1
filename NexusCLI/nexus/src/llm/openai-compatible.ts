@@ -28,6 +28,7 @@ const chunkSchema = z.object({
 })
 
 export class OpenAICompatibleProvider implements Provider {
+  constructor(private readonly env: Record<string, string | undefined> = process.env) {}
   async *stream(request: ModelRequest): AsyncIterable<ModelEvent> {
     const response = await this.connect(request)
     if (!response.body) throw new NexusError("PROTOCOL", "Provider returned an empty response")
@@ -78,7 +79,7 @@ export class OpenAICompatibleProvider implements Provider {
       throw new NexusError("CONFIG", "Invalid provider URL")
     if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
       throw new NexusError("CONFIG", "Remote providers require HTTPS")
-    const key = process.env[request.model.apiKeyEnv]
+    const key = this.env[request.model.apiKeyEnv]
     for (const attempt of [0, 1, 2]) {
       abort(request.signal)
       const response = await fetch(url, {
@@ -113,7 +114,8 @@ export class OpenAICompatibleProvider implements Provider {
         }),
       })
       if (response.ok) return response
-      const detail = bound(await responseText(response), 1000).text
+      const raw = await responseText(response)
+      const detail = bound(key ? raw.replaceAll(key, "[REDACTED]") : raw, 1000).text
       if (response.status === 413 || /context.{0,30}(length|window|exceed|limit)|maximum context/i.test(detail))
         throw new NexusError("CONTEXT_OVERFLOW", detail)
       const retryable = response.status === 429 || response.status >= 500

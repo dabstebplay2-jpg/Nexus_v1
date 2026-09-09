@@ -1,0 +1,361 @@
+/* Dark, minimal, close to VS Code. A working tool first: dense, monospaced, high contrast. */
+:root {
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --panel-2: #2d2d30;
+  --border: #3c3c3c;
+  --text: #cccccc;
+  --text-strong: #ffffff;
+  --muted: #858585;
+  --accent: #0e639c;
+  --accent-hover: #1177bb;
+  --pass: #89d185;
+  --fail: #f14c4c;
+  --unknown: #cca700;
+  --mono: "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    13px/1.5 -apple-system,
+    "Segoe UI",
+    Roboto,
+    Ubuntu,
+    sans-serif;
+}
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: #3a3a3d;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  padding: 4px 6px;
+  width: 100%;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 1px solid var(--accent-hover);
+}
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.brand {
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: 0.4px;
+}
+.brand span {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 6px;
+}
+.topbar .field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar .field label {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.topbar input,
+.topbar select {
+  width: auto;
+  min-width: 130px;
+}
+.spacer {
+  flex: 1;
+}
+.columns {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1.1fr);
+  min-height: 0;
+}
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+.pane:last-child {
+  border-right: none;
+}
+.pane > header {
+  padding: 6px 12px;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pane > .body {
+  overflow: auto;
+  padding: 10px 12px;
+  min-height: 0;
+  flex: 1;
+}
+.row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.project {
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.project:hover {
+  background: var(--panel-2);
+}
+.project.selected {
+  background: #04395e;
+  border-color: var(--accent);
+}
+.project .name {
+  color: var(--text-strong);
+}
+.project .path {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tag.pass {
+  color: var(--pass);
+  border-color: #33553a;
+}
+.tag.fail {
+  color: var(--fail);
+  border-color: #5a2b2b;
+}
+.tag.unknown {
+  color: var(--unknown);
+  border-color: #574c19;
+}
+.tag.busy {
+  color: #75beff;
+  border-color: #234a6b;
+}
+.section {
+  margin-bottom: 14px;
+}
+.section > h3 {
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--muted);
+}
+.log {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.log div {
+  padding: 1px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubble {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: var(--panel);
+}
+.bubble.user {
+  background: #04395e;
+  border-color: var(--accent);
+}
+.bubble.alert {
+  border-color: var(--unknown);
+}
+.bubble > .who {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.composer {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.composer textarea {
+  resize: vertical;
+  min-height: 56px;
+  font-family: var(--mono);
+}
+.error {
+  color: var(--fail);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #5a2b2b;
+  background: #2d1f1f;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.glyph {
+  width: 12px;
+  display: inline-block;
+  text-align: center;
+}
+.glyph.pass {
+  color: var(--pass);
+}
+.glyph.fail {
+  color: var(--fail);
+}
+.glyph.unknown {
+  color: var(--unknown);
+}
+details.patch {
+  margin-top: 4px;
+}
+details.patch summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+}
+details.patch pre {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px;
+  overflow: auto;
+  max-height: 280px;
+  font-family: var(--mono);
+  font-size: 11px;
+  margin: 4px 0 0;
+}
+.settings {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 6px 8px;
+  align-items: center;
+}
+.settings label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.model-config {
+  flex: 1;
+  min-width: 0;
+  flex-basis: 100%;
+  order: 3;
+}
+.topbar {
+  flex-wrap: wrap;
+}
+.manual-model input {
+  width: auto;
+  min-width: 0;
+}
+.model-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.model-controls .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.model-controls .endpoint-field {
+  flex: 1;
+  min-width: 260px;
+}
+.model-controls select {
+  max-width: 320px;
+}
+.model-status {
+  padding: 8px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.manual-model {
+  font-size: 12px;
+  align-self: center;
+}

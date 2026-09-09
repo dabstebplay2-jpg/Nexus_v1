@@ -2,6 +2,8 @@ import path from "node:path"
 const violations: string[] = []
 const graph = new Map<string, string[]>()
 for await (const file of new Bun.Glob("{src,apps}/**/*.ts").scan(".")) {
+  // Apps may carry their own dependencies (apps/web); only first-party code has boundaries.
+  if (file.replaceAll("\\", "/").includes("node_modules/")) continue
   const content = await Bun.file(file).text()
   const edges: string[] = []
   for (const match of content.matchAll(/(?:from\s+|import\s*\()(["'])([^"']+)\1/g)) {
