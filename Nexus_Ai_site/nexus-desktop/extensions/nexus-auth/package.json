@@ -1,0 +1,97 @@
+{
+  "name": "nexus-auth",
+  "displayName": "Nexus Account",
+  "description": "Sign in to Nexus cloud (auth, tokens)",
+  "version": "1.3.0",
+  "publisher": "nexus",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished", "onUri", "onView:nexus.account"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nexus.signIn",
+        "title": "Nexus: Sign In",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.signInGoogle",
+        "title": "Nexus: Sign In with Google",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.signInEmailCode",
+        "title": "Nexus: Sign In with Email Code",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.signOut",
+        "title": "Nexus: Sign Out",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.openProfileWeb",
+        "title": "Nexus: Open Profile in Browser",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.refreshProfile",
+        "title": "Nexus: Refresh Account",
+        "category": "Nexus",
+        "icon": "$(refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "Nexus",
+      "properties": {
+        "nexus.cloudUrl": {
+          "type": "string",
+          "default": "https://nexus-zeta-ruby-12.vercel.app/api",
+          "description": "Nexus Cloud API base. Production: https://nexus-zeta-ruby-12.vercel.app/api (Vercel→Render). Direct: https://nexus-cloud-bxcc.onrender.com/v1"
+        },
+        "nexus.webAppUrl": {
+          "type": "string",
+          "default": "https://nexus-zeta-ruby-12.vercel.app",
+          "description": "Nexus web app URL for profile and billing"
+        }
+      }
+    },
+    "views": {
+      "nexus": [
+        {
+          "type": "webview",
+          "id": "nexus.account",
+          "name": "Вход и аккаунт"
+        }
+      ]
+    },
+    "menus": {
+      "commandPalette": [
+        { "command": "nexus.signIn" },
+        { "command": "nexus.signInGoogle" },
+        { "command": "nexus.signInEmailCode" },
+        { "command": "nexus.signOut" },
+        { "command": "nexus.openProfileWeb" }
+      ],
+      "view/title": [
+        {
+          "command": "nexus.signIn",
+          "when": "view == nexus.account && !nexus.authorized",
+          "group": "navigation"
+        },
+        {
+          "command": "nexus.refreshProfile",
+          "when": "view == nexus.account && nexus.authorized",
+          "group": "navigation"
+        },
+        {
+          "command": "nexus.openProfileWeb",
+          "when": "view == nexus.account && nexus.authorized",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}

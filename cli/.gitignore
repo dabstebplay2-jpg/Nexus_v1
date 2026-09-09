@@ -1,0 +1,7 @@
+.venv/
+.venv-train/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+config/settings.json
+training/runs/

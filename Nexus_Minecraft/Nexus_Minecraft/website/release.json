@@ -1,0 +1,16 @@
+{
+  "repo": "dabstebplay2-jpg/Nexus_mincraft_laucher",
+  "version": "1.1.4.2",
+  "channel": "stable",
+  "installer": "https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncherSetup-1.1.4.2-win-x64.exe",
+  "portable": "https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncher-1.1.4.2-win-x64-portable.zip",
+  "latest_release_api": "https://api.github.com/repos/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest",
+  "latest_release_page": "https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest",
+  "direct_download": "https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncherSetup-1.1.4.2-win-x64.exe",
+  "portable_download": "https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncher-1.1.4.2-win-x64-portable.zip",
+  "installer_filename": "NexusLauncherSetup-1.1.4.2-win-x64.exe",
+  "portable_filename": "NexusLauncher-1.1.4.2-win-x64-portable.zip",
+  "platform": "windows-x64",
+  "download_mode": "github-release-latest-download",
+  "site_quality": "auto-deploy-latest-release"
+}

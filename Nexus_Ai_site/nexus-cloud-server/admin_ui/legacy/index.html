@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nexus Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <h1>Nexus Admin</h1>
+      <p class="muted">Облако: укажите <strong>Vercel /api</strong> (если Render недоступен) или Render напрямую. Локальный UI: порт <strong>8790</strong> (<code>start_local_admin.ps1</code>).</p>
+      <label class="field-label">Сервер API (Render)
+        <input id="login-server" type="url" placeholder="https://nexus-zeta-ruby-12.vercel.app/api" />
+      </label>
+      <label class="field-label">Пароль (NEXUS_ADMIN_PASSWORD)
+        <input id="login-password" type="password" placeholder="Пароль админки" autocomplete="current-password" />
+      </label>
+      <button id="login-btn" type="button">Войти</button>
+      <p id="login-error" class="error hidden"></p>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">Nexus <span>Admin</span></div>
+      <p id="server-label" class="server-label muted"></p>
+      <nav>
+        <button type="button" data-tab="dashboard" class="nav active">Обзор</button>
+        <button type="button" data-tab="site" class="nav">Сайт</button>
+        <button type="button" data-tab="users" class="nav">Пользователи</button>
+        <button type="button" data-tab="transactions" class="nav">Транзакции</button>
+        <button type="button" data-tab="invoices" class="nav">Счета</button>
+        <button type="button" data-tab="logs" class="nav">Логи сервера</button>
+        <button type="button" data-tab="audit" class="nav">Действия админа</button>
+        <button type="button" data-tab="support" class="nav">Поддержка</button>
+        <button type="button" data-tab="routerai" class="nav">Ключи RouterAI</button>
+      </nav>
+      <label class="live-toggle muted"><input type="checkbox" id="live-enabled" checked /> Обновление (3 с)</label>
+      <button type="button" id="logout-btn" class="logout">Выйти</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h2 id="page-title">Обзор</h2>
+        <div class="topbar-right">
+          <span id="live-pill" class="pill live">Онлайн</span>
+          <div id="status-pill" class="pill">…</div>
+        </div>
+      </header>
+
+      <section id="tab-dashboard" class="tab">
+        <div id="dash-funding" class="funding-panel"></div>
+        <div class="cards" id="dash-cards"></div>
+        <h3>Новые пользователи</h3>
+        <div id="dash-recent" class="table-wrap"></div>
+      </section>
+
+      <section id="tab-site" class="tab hidden">
+        <div id="site-overview" class="site-grid"></div>
+        <p class="muted site-hint">Админка управляет облаком (Render): аккаунты, тарифы, RouterAI, счета. Фронт — Vercel.</p>
+      </section>
+
+      <section id="tab-users" class="tab hidden">
+        <div class="toolbar">
+          <input id="user-search" type="search" placeholder="Поиск по email…" />
+          <select id="user-tier-filter">
+            <option value="">Все тарифы</option>
+            <option>FREE</option>
+            <option>HOBBY</option>
+            <option>STANDARD</option>
+            <option>PRO</option>
+            <option>ULTRA</option>
+          </select>
+          <button type="button" id="user-refresh">Обновить</button>
+        </div>
+        <div id="users-table" class="table-wrap"></div>
+      </section>
+
+      <section id="tab-transactions" class="tab hidden">
+        <div id="tx-table" class="table-wrap"></div>
+      </section>
+
+      <section id="tab-invoices" class="tab hidden">
+        <div id="inv-table" class="table-wrap"></div>
+      </section>
+
+      <section id="tab-logs" class="tab hidden">
+        <div class="toolbar">
+          <select id="log-level">
+            <option value="">Все уровни</option>
+            <option>INFO</option>
+            <option>WARNING</option>
+            <option>ERROR</option>
+          </select>
+          <input id="log-search" type="search" placeholder="Фильтр…" />
+          <button type="button" id="log-refresh">Обновить</button>
+        </div>
+        <pre id="log-view" class="log-view"></pre>
+      </section>
+
+      <section id="tab-audit" class="tab hidden">
+        <div id="audit-table" class="table-wrap"></div>
+      </section>
+
+      <section id="tab-support" class="tab hidden">
+        <div class="support-layout">
+          <div class="support-list-pane">
+            <div class="toolbar">
+              <select id="support-status-filter">
+                <option value="">Все статусы</option>
+                <option value="open">open</option>
+                <option value="answered">answered</option>
+                <option value="closed">closed</option>
+              </select>
+              <input id="support-search" type="search" placeholder="Email…" />
+              <button type="button" id="support-refresh">Обновить</button>
+            </div>
+            <div id="support-tickets-table" class="table-wrap support-tickets-table"></div>
+          </div>
+          <div class="support-detail-pane">
+            <div id="support-detail-empty" class="muted support-empty">Выберите обращение слева</div>
+            <div id="support-detail" class="hidden">
+              <div class="support-detail-head">
+                <h3 id="support-subject">—</h3>
+                <p id="support-meta" class="muted small"></p>
+                <div class="support-detail-actions">
+                  <button type="button" id="support-close-ticket" class="danger-outline">Закрыть тикет</button>
+                  <button type="button" id="support-reopen-ticket" class="btn-muted">Открыть снова</button>
+                </div>
+              </div>
+              <div id="support-thread" class="support-thread"></div>
+              <div class="support-reply">
+                <textarea id="support-reply-body" rows="3" placeholder="Ответ пользователю…"></textarea>
+                <div id="support-reply-attach" class="support-reply-attach"></div>
+                <div class="support-reply-bar">
+                  <label class="btn-muted attach-label">
+                    📎 Фото
+                    <input type="file" id="support-file-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden />
+                  </label>
+                  <button type="button" id="support-send-reply" class="btn-primary">Отправить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-routerai" class="tab hidden">
+        <div id="rai-funding" class="funding-panel"></div>
+        <div class="toolbar">
+          <button type="button" id="rai-refresh">Обновить</button>
+          <button type="button" id="rai-funding-check" class="btn-muted">Проверить депозит / Discord</button>
+        </div>
+        <pre id="rai-view" class="log-view"></pre>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="user-dialog">
+    <form method="dialog" id="user-form" class="ud-form">
+      <h3 id="ud-title">Пользователь</h3>
+      <p id="ud-status" class="ud-status muted"></p>
+      <div class="ud-grid">
+        <label>Email <input id="ud-email" type="email" autocomplete="off" /></label>
+        <label>Тариф
+          <select id="ud-tier">
+            <option>FREE</option>
+            <option>HOBBY</option>
+            <option>STANDARD</option>
+            <option>PRO</option>
+            <option>ULTRA</option>
+          </select>
+        </label>
+        <label>Баланс USD <input id="ud-balance" type="number" step="0.01" min="0" /></label>
+        <label>Новый пароль <input id="ud-password" type="password" minlength="6" placeholder="пусто = не менять" autocomplete="new-password" /></label>
+      </div>
+      <label class="ud-check">
+        <input type="checkbox" id="ud-refresh-routerai" />
+        Обновить ключ RouterAI (пересоздать и привязать к аккаунту)
+      </label>
+      <details class="ud-manual-key">
+        <summary>Ключ вручную (если нет мастер-ключа на сервере)</summary>
+        <p class="muted small">RouterAI → API-ключи → скопировать <code>sk-…</code> пользователя</p>
+        <label>API-ключ <input id="ud-manual-key" type="text" placeholder="sk-…" autocomplete="off" /></label>
+        <label>Key ID (опционально) <input id="ud-manual-key-id" type="text" placeholder="из кабинета RouterAI" autocomplete="off" /></label>
+      </details>
+      <details>
+        <summary>Транзакции и счета</summary>
+        <pre id="ud-extra" class="log-view small"></pre>
+      </details>
+      <div class="dialog-footer">
+        <button type="button" id="ud-save" class="btn-primary">Сохранить</button>
+        <button type="button" id="ud-revoke" class="danger-outline">FREE</button>
+        <button type="button" id="ud-delete" class="danger">Удалить</button>
+        <button type="button" id="ud-close" class="btn-muted">Закрыть</button>
+      </div>
+      <p id="ud-save-msg" class="save-msg hidden"></p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js?v=15"></script>
+</body>
+</html>

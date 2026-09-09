@@ -1,0 +1,92 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+
+# AI models and runtimes
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Native binaries
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+dist/
+build/
+.cache/
+
+# Logs
+*.log
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Node/Bun
+node_modules/
+dist/
+build/
+
+# AI models
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Native binaries
+*.dll
+*.exe
+
+# Archives
+*.zip
+*.rar
+
+# Logs
+*.log
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# ML data
+Create_my_AI_NEXUSAI/datasets/
+Create_my_AI_NEXUSAI/archive/
+Create_my_AI_NEXUSAI/venv/
+
+# AI cache
+cli/unsloth_compiled_cache/
+
+# Build files
+dist/
+build/
+*.exe
+*.dll
+
+# Models
+*.bin
+*.gguf
+*.safetensors

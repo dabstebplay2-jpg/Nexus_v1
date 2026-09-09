@@ -1,0 +1,11 @@
+nexus-browser/**
+nexus-desktop/**
+backend/**
+nexus-cloud-server/**
+_deploy/**
+**/*.exe
+**/*.7z
+**/node_modules/**
+**/dist-out*/
+**/win-unpacked/**
+**/.git/**

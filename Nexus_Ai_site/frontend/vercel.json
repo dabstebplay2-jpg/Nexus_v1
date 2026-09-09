@@ -1,0 +1,58 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build && npm run changelog:notify:on-deploy",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "env": {
+    "NEXUS_CLOUD_SERVER_URL": "https://nexus-cloud-bxcc.onrender.com",
+    "VITE_CLOUD_FALLBACK_URL": "https://nexus-cloud-bxcc.onrender.com",
+    "VITE_GOOGLE_AUTH_ENABLED": "true"
+  },
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index?__subpath=$1" },
+    { "source": "/((?!api/|extensions/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), geolocation=(), microphone=(), payment=(self)"
+        }
+      ]
+    },
+    {
+      "source": "/extensions/(.*)\\.vsix",
+      "headers": [
+        { "key": "Content-Type", "value": "application/vsix" },
+        { "key": "Content-Disposition", "value": "attachment; filename=\"nexus-ai.vsix\"" }
+      ]
+    }
+  ]
+}

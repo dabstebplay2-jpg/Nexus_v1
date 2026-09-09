@@ -1,0 +1,21 @@
+{
+  "name": "Nexus Launcher",
+  "short_name": "Nexus",
+  "description": "Minecraft launcher for Windows",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f4f7ee",
+  "theme_color": "#f4f7ee",
+  "icons": [
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

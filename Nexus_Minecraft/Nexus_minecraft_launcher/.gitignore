@@ -1,0 +1,93 @@
+﻿# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+
+# Runtime data
+instances/
+logs/
+storage/modrinth_cache/
+backups/
+
+# Local user data
+data/*.json
+data/skins/
+
+# Website generated downloads
+website/downloads/*.zip
+website/downloads/*.exe
+
+# Reports / temp
+project_structure_for_cleanup.txt
+project_audit_report.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Website release packages
+website/*.zip
+website/*.exe
+website/downloads/*.zip
+website/downloads/*.exe
+
+# Secrets / env
+.env
+*.env
+auth/oauth_config.local.py
+
+# Local release packages
+release/
+
+# Local release packages
+release/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Build outputs
+build/pyinstaller/
+dist/
+release/
+*.spec.bak
+
+# Nexus runtime data
+data/logs/
+data/instances/
+data/tokens/
+data/updates/
+data/oauth_settings.json
+storage/modrinth_cache/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# Runtime folders - do not publish
+data/
+data_backup_before_*/
+dist/
+release/
+.venv/
+__pycache__/
+
+# Keep PyInstaller specs, ignore heavy temporary PyInstaller output
+!build/
+build/*
+!build/*.spec
+build/pyinstaller/
+

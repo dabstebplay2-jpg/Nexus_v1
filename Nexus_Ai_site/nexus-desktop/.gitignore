@@ -1,0 +1,8 @@
+vscodium/
+vscode/
+VSCode-*/
+*.vsix
+node_modules/
+out/
+dist/
+build/

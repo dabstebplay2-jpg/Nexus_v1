@@ -1,0 +1,35 @@
+
+class ChatEngine:
+
+    def __init__(self, runtime):
+        self.runtime = runtime
+
+
+    async def ask(self, text):
+
+        model = self.runtime.models.get_current()
+
+        if model is None:
+            return "?????? ?? ???????"
+
+
+        try:
+
+            provider = self.runtime.models.get_provider(
+                model.id
+            )
+
+
+            if hasattr(provider, "generate"):
+
+                return await provider.generate(
+                    text
+                )
+
+
+            return "????????? ?????? ?? ???????????? ?????????"
+
+
+        except Exception as e:
+
+            return f"?????? ??????: {e}"

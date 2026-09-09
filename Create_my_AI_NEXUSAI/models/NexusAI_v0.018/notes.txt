@@ -1,0 +1,20 @@
+NexusAI v0.018 baseline
+
+Architecture:
+Transformer
+
+Dataset:
+TinyStories
+
+Training:
+RTX 3060 12GB
+Batch size: 256
+
+Completed epochs:
+14
+
+Best loss:
+2.9933789093033587
+
+Purpose:
+First working language model experiment.

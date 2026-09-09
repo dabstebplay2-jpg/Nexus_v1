@@ -1,0 +1,14 @@
+[
+  {
+    "name": "qwen2.5:0.5b",
+    "type": "ollama",
+    "provider": "ollama"
+  },
+  {
+    "name": "Happ",
+    "path": "C:\\Users\\dobrynya\\AppData\\Local\\Happ",
+    "size_gb": 0.0,
+    "type": "HuggingFace",
+    "provider": "transformers"
+  }
+]

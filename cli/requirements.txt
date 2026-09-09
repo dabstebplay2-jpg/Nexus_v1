@@ -1,0 +1,8 @@
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+--only-binary llama-cpp-python
+
+llama-cpp-python==0.3.35
+nvidia-cublas-cu12==12.4.5.8
+nvidia-cuda-runtime-cu12==12.4.127
+psutil==7.2.2
+pytest==8.4.2

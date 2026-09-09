@@ -1,0 +1,105 @@
+{
+  "name": "nexus-ai",
+  "displayName": "Nexus AI",
+  "description": "Cloud AI chat with streaming, editor context, web search, thinking mode, and IDE agent tools",
+  "version": "1.8.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexus-ide/nexus-ide"
+  },
+  "icon": "media/brand/logo/brand.png",
+  "publisher": "nexus",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Machine Learning", "Other"],
+  "extensionDependencies": ["nexus.nexus-auth"],
+  "activationEvents": ["onView:nexus.aiChat", "onCommand:nexus.openAiChat"],
+  "main": "./extension.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Nexus AI",
+      "properties": {
+        "nexus.ai.confirmWrites": {
+          "type": "boolean",
+          "default": true,
+          "description": "Показывать diff перед записью файлов агентом (write_file)."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "nexus.openAiChat",
+        "title": "Nexus: Open AI Chat",
+        "category": "Nexus",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "nexus.ai.addSelection",
+        "title": "Nexus: Add Selection to AI Chat",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.ai.applyLastBlock",
+        "title": "Nexus: Apply Last AI Code Block",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.ai.searchWorkspace",
+        "title": "Nexus: Search Workspace for AI Context",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.ai.attachFile",
+        "title": "Nexus: Attach File to AI Chat",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.openSupport",
+        "title": "Nexus: Support",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.ai.clearChat",
+        "title": "Nexus: Clear AI Chat",
+        "category": "Nexus"
+      },
+      {
+        "command": "nexus.ai.showBuildInfo",
+        "title": "Nexus: Show AI Extension Info",
+        "category": "Nexus"
+      }
+    ],
+    "views": {
+      "nexus": [
+        {
+          "type": "webview",
+          "id": "nexus.aiChat",
+          "name": "AI Chat"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "nexus.ai.addSelection",
+          "group": "nexus@1"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "nexus.openAiChat",
+          "when": "view == nexus.aiChat",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        { "command": "nexus.ai.addSelection" },
+        { "command": "nexus.ai.applyLastBlock" },
+        { "command": "nexus.ai.searchWorkspace" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Nexus Browser",
+  "shortName": "Nexus",
+  "protocol": "nexus-browser",
+  "defaultCloudUrl": "https://nexus-zeta-ruby-12.vercel.app/api",
+  "fallbackCloudUrls": [
+    "https://nexus-cloud-bxcc.onrender.com/v1"
+  ],
+  "webAppUrl": "https://nexus-zeta-ruby-12.vercel.app",
+  "userAgentSuffix": "NexusBrowser/0.1"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@axiom/server",
+  "version": "0.1.0-alpha.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --include ../../packages/**/dist/**/*.js src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/index.js"
+  },
+  "dependencies": {
+    "@axiom/core": "0.1.0-alpha.2",
+    "@axiom/providers": "0.1.0-alpha.2",
+    "@axiom/shared": "0.1.0-alpha.2",
+    "@axiom/storage": "0.1.0-alpha.2",
+    "express": "^5.1.0",
+    "zod": "^4.1.0"
+  }
+}

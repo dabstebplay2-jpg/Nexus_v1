@@ -1,0 +1,213 @@
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (min-width: 1500px) {
+  .welcome {
+    padding-bottom: 50px;
+  }
+  .welcome h1 {
+    font-size: 51px;
+  }
+  .prompt-grid {
+    margin-top: 45px;
+  }
+  .composer-area {
+    padding-bottom: 28px;
+  }
+}
+@media (max-height: 800px) and (min-width: 761px) {
+  .welcome {
+    padding-top: 12px;
+    padding-bottom: 15px;
+  }
+  .welcome-emblem {
+    margin-bottom: 18px;
+    width: 48px;
+    height: 48px;
+  }
+  .welcome-emblem > span {
+    font-size: 33px;
+  }
+  .welcome h1 {
+    font-size: 36px;
+  }
+  .welcome > p {
+    margin-bottom: 22px;
+  }
+  .prompt-grid > button {
+    padding: 14px 17px;
+    gap: 7px;
+  }
+  .welcome-footnote {
+    margin-top: 17px;
+  }
+  .eyebrow {
+    margin-bottom: 13px;
+  }
+  .composer-area {
+    padding-bottom: 16px;
+  }
+}
+@media (max-width: 1000px) {
+  .sidebar {
+    width: 230px;
+  }
+  .chat-header {
+    padding: 0 22px;
+  }
+  .private-label {
+    display: none;
+  }
+  .composer-note > span {
+    display: none;
+  }
+  .welcome h1 {
+    font-size: 38px;
+  }
+  .prompt-grid > button {
+    padding: 16px;
+  }
+  .prompt-grid button > span {
+    font-size: 9px;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: 260px;
+  }
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: #0008;
+    z-index: 35;
+  }
+  .chat-header {
+    height: 60px;
+    padding: 0 18px;
+  }
+  .header-title {
+    max-width: 170px;
+  }
+  .welcome {
+    padding: 25px 21px;
+  }
+  .welcome h1 {
+    font-size: 34px;
+  }
+  .welcome > p {
+    font-size: 12px;
+  }
+  .welcome-emblem {
+    margin-bottom: 22px;
+    width: 48px;
+    height: 48px;
+  }
+  .welcome-emblem > span {
+    font-size: 35px;
+  }
+  .prompt-grid {
+    gap: 8px;
+  }
+  .prompt-grid > button {
+    padding: 14px 12px;
+  }
+  .prompt-grid strong {
+    font-size: 11px;
+  }
+  .prompt-grid button > span {
+    font-size: 9px;
+    line-height: 1.7;
+  }
+  .prompt-grid strong > svg {
+    display: none;
+  }
+  .welcome-footnote {
+    font-size: 9px;
+  }
+  .composer-area {
+    padding: 8px 13px 14px;
+  }
+  .composer textarea {
+    padding: 17px 16px 6px;
+    font-size: 12px;
+  }
+  .composer-note {
+    font-size: 8px;
+    justify-content: center;
+  }
+  .model-popover {
+    left: -44px;
+    width: 340px;
+  }
+  .message-list {
+    padding: 25px 17px;
+  }
+  .message {
+    gap: 8px;
+  }
+  .user-message {
+    margin-left: 35px;
+  }
+  .markdown {
+    font-size: 12px;
+  }
+  .settings-content {
+    padding: 24px 20px;
+  }
+  .page-header {
+    padding: 20px;
+  }
+  .version {
+    display: none;
+  }
+  .provider-grid {
+    grid-template-columns: 1fr;
+  }
+  .preset-status {
+    font-size: 8px;
+  }
+  .provider-presets > button {
+    padding: 14px 10px;
+    gap: 9px;
+  }
+  .settings-content h1 {
+    font-size: 30px;
+  }
+  .global-error {
+    margin: 0 12px 6px;
+    font-size: 11px;
+  }
+  .is-empty {
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

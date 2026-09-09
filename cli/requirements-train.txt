@@ -1,0 +1,16 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Kept separate from the llama.cpp inference environment.  These are the
+# exact versions verified in the native Windows Unsloth Studio runtime on this
+# machine.
+torch==2.10.0+cu130
+torchvision==0.25.0+cu130
+xformers==0.0.34
+unsloth==2026.8.19
+unsloth-zoo==2026.8.13
+transformers==5.5.0
+peft==0.18.1
+trl==0.23.1
+bitsandbytes==0.50.1
+datasets==4.3.0
+accelerate==1.14.0

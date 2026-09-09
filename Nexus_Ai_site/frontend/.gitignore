@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vercel/
+.env
+.env.local
+.env.*.local
+.env.vercel.tmp
+discord-webhook.local.json
+discord-bot.local.json
+*.log
+.vercel

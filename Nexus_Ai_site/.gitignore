@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+**/dist/
+!nexus-cloud-server/admin_ui/dist/.gitkeep
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+**/discord-webhook.local.json
+**/discord-bot.local.json
+deploy/render-production.env
+
+# Databases & runtime artifacts
+*.db
+*.sqlite3
+
+# IDE / OS
+.idea/
+.vscode/
+
+# Cursor — rules, settings, agents (только локально, не коммитить)
+.cursor/
+.cursor/**
+.cursor/rules/
+**/.cursor/rules/**
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+debug-*.log
+
+# Local deploy clones / test artifacts
+_deploy/
+frontend/test-results/
+
+# Separate / legacy (not part of web monorepo)
+ai_nexus/
+nexus-backend/
+nexus-frontend/
+portal/
+.vercel

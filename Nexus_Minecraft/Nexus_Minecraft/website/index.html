@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nexus Launcher 1.1.4.2 — Minecraft лаунчер для Windows</title>
+  <meta name="description" content="Nexus Launcher 1.1.4.2 — стабильный Minecraft-лаунчер для Windows. Сборки, моды, шейдеры, ресурспаки, Ely.by, Discord Rich Presence, installer и portable ZIP." />
+  <meta name="theme-color" content="#f4f7ee" />
+  <meta name="color-scheme" content="light dark" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Nexus Launcher" />
+  <meta property="og:description" content="Minecraft-лаунчер для Windows: сборки, моды, шейдеры, ресурспаки, запуск Minecraft и релизы." />
+  <meta property="og:image" content="assets/og-cover.svg" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    window.NEXUS_VERSION = "1.1.4.2";
+    window.NEXUS_REPO = "dabstebplay2-jpg/Nexus_mincraft_laucher";
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Nexus Launcher">
+      <img src="assets/logo.svg" alt="" />
+      <span>
+        <b>Nexus Launcher</b>
+        <small>Minecraft desktop app</small>
+      </span>
+    </a>
+
+    <button class="menu-button" id="menuBtn" type="button" aria-label="Открыть меню">Меню</button>
+
+    <nav class="site-nav" id="nav">
+      <a href="#download">Скачать</a>
+      <a href="#features">Возможности</a>
+      <a href="#content">Контент</a>
+      <a href="#roadmap">Roadmap</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="release-badge" id="releaseBadge">
+          <span class="release-badge__dot" aria-hidden="true"></span>
+          <span class="release-badge__label">Последний релиз</span>
+          <strong class="release-badge__pill">v<span id="versionText">1.1.4.2</span></strong>
+        </div>
+
+        <h1>Nexus Launcher для Minecraft.</h1>
+
+        <p class="lead">
+          Лаунчер для Windows: создание сборок, установка модов, шейдеров и ресурспаков,
+          настройка RAM и Java, запуск Minecraft и отображение активности в Discord.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" id="downloadBtn" href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncherSetup-1.1.4.2-win-x64.exe">
+            Скачать для Windows
+          </a>
+          <a class="btn btn-secondary" href="#features">Возможности лаунчера</a>
+        </div>
+
+        <div class="trusted-line">
+          <span>Windows installer</span>
+          <span>Portable ZIP</span>
+          <span>Modrinth catalog</span>
+          <span>Discord Rich Presence</span>
+        </div>
+      </div>
+
+      <aside class="download-console" id="download" aria-label="Download center">
+        <div class="console-top">
+          <div>
+            <small>Центр загрузки</small>
+            <b>Nexus Launcher</b>
+          </div>
+          <span class="console-status" id="consoleStatus">
+            <span class="console-status__dot" aria-hidden="true"></span>
+            STABLE
+          </span>
+        </div>
+
+        <div class="release-row">
+          <div class="release-row__copy">
+            <span class="release-row__label">Версия</span>
+            <small class="release-row__hint">Windows · x64 · стабильный канал</small>
+          </div>
+          <strong class="release-row__value">v<span id="versionStat">1.1.4.2</span></strong>
+        </div>
+
+        <div class="asset-list">
+          <a class="asset-card recommended" id="setupBtn" href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncherSetup-1.1.4.2-win-x64.exe">
+            <div class="asset-card__head">
+              <span class="asset-card__tag">Рекомендуется</span>
+              <span class="asset-card__platform" aria-hidden="true">Win</span>
+            </div>
+            <b>Windows installer</b>
+            <small id="fileName">NexusLauncherSetup-1.1.4.2-win-x64.exe</small>
+          </a>
+
+          <a class="asset-card" id="portableBtn" href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases/latest/download/NexusLauncher-1.1.4.2-win-x64-portable.zip">
+            <div class="asset-card__head">
+              <span class="asset-card__tag">Альтернатива</span>
+              <span class="asset-card__platform asset-card__platform--muted" aria-hidden="true">ZIP</span>
+            </div>
+            <b>Portable ZIP</b>
+            <small>NexusLauncher-1.1.4.2-win-x64-portable.zip</small>
+          </a>
+        </div>
+
+        <div class="release-meta">
+          <div>
+            <span>Статус</span>
+            <b id="releaseStatus">Стабильный релиз 1.1.4.2</b>
+          </div>
+          <div>
+            <span>Дата</span>
+            <b id="releaseDate">ожидание</b>
+          </div>
+          <div>
+            <span>Размер</span>
+            <b id="releaseSize">ожидание</b>
+          </div>
+        </div>
+
+        <button class="copy-link" id="copyLinkBtn" type="button">Скопировать ссылку на installer</button>
+      </aside>
+    </section>
+
+    <section class="quick-strip">
+      <article>
+        <b>01</b>
+        <span>Создание сборки</span>
+      </article>
+      <article>
+        <b>02</b>
+        <span>Выбор версии и loader</span>
+      </article>
+      <article>
+        <b>03</b>
+        <span>Установка контента</span>
+      </article>
+      <article>
+        <b>04</b>
+        <span>Запуск Minecraft</span>
+      </article>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-head">
+        <small>Возможности</small>
+        <h2>Основные функции Nexus Launcher</h2>
+        <p>
+          Nexus Launcher объединяет управление сборками, установку контента, настройки запуска
+          и релизные версии приложения для Windows.
+        </p>
+      </div>
+
+      <div class="feature-list">
+        <article>
+          <span class="feature-icon">I</span>
+          <div>
+            <h3>Управление сборками</h3>
+            <p>Создание отдельных Minecraft-сборок с собственной версией игры, loader, RAM, Java и папками.</p>
+          </div>
+        </article>
+        <article>
+          <span class="feature-icon">M</span>
+          <div>
+            <h3>Каталог Modrinth</h3>
+            <p>Поиск и установка модов, модпаков, шейдеров и ресурспаков из каталога Modrinth.</p>
+          </div>
+        </article>
+        <article>
+          <span class="feature-icon">D</span>
+          <div>
+            <h3>Discord Rich Presence</h3>
+            <p>Отображение статуса в Discord: пользователь находится в лаунчере или играет через Nexus.</p>
+          </div>
+        </article>
+        <article>
+          <span class="feature-icon">A</span>
+          <div>
+            <h3>Аккаунты Ely.by</h3>
+            <p>Вход через Ely.by OAuth (PKCE), обновление токена перед запуском и authlib-injector для скина в игре.</p>
+          </div>
+        </article>
+        <article>
+          <span class="feature-icon">T</span>
+          <div>
+            <h3>Темы интерфейса</h3>
+            <p>Несколько полноэкранных тем оформления: тёмная, AMOLED, лесная, океанская, фиолетовая и закатная.</p>
+          </div>
+        </article>
+        <article>
+          <span class="feature-icon">R</span>
+          <div>
+            <h3>Релизные версии</h3>
+            <p>Поддержка Windows EXE, installer, portable ZIP и SHA256-файлов в GitHub Releases.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section compare" id="content">
+      <div class="compare-copy">
+        <small>Контент</small>
+        <h2>Разделение модов, модпаков, шейдеров и ресурспаков</h2>
+        <p>
+          Лаунчер определяет тип проекта и устанавливает файлы в правильные папки выбранной сборки.
+          Это помогает избежать смешивания модов, шейдеров и ресурспаков в одном месте.
+        </p>
+      </div>
+
+      <div class="compare-grid">
+        <article>
+          <b>Моды</b>
+          <span>Файлы .jar устанавливаются в папку .minecraft/mods выбранной сборки.</span>
+        </article>
+        <article>
+          <b>Шейдеры</b>
+          <span>Shader pack устанавливается в .minecraft/shaderpacks и выбирается в настройках Iris.</span>
+        </article>
+        <article>
+          <b>Ресурспаки</b>
+          <span>Resource pack устанавливается в .minecraft/resourcepacks выбранной сборки.</span>
+        </article>
+        <article>
+          <b>Модпаки</b>
+          <span>Modpack используется для создания или импорта готовой Minecraft-сборки.</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="section workflow">
+      <div class="section-head">
+        <small>Запуск</small>
+        <h2>Как используется Nexus Launcher</h2>
+      </div>
+
+      <div class="workflow-board">
+        <article>
+          <span>Шаг 1</span>
+          <h3>Создание профиля</h3>
+          <p>Выбирается версия Minecraft, loader, название сборки и параметры запуска.</p>
+        </article>
+        <article>
+          <span>Шаг 2</span>
+          <h3>Установка контента</h3>
+          <p>Моды, шейдеры, ресурспаки и модпаки устанавливаются через каталог лаунчера.</p>
+        </article>
+        <article>
+          <span>Шаг 3</span>
+          <h3>Запуск игры</h3>
+          <p>Nexus запускает Minecraft с выбранными настройками RAM, Java и разрешения окна.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section roadmap" id="roadmap">
+      <div class="section-head">
+        <small>Roadmap</small>
+        <h2>План развития Nexus Launcher</h2>
+      </div>
+
+      <div class="roadmap-list">
+        <article class="roadmap-item roadmap-item--done">
+          <time>v0.8</time>
+          <b>Сайт и интерфейс</b>
+          <p>Улучшение сайта, страниц загрузки, описания функций и визуальной структуры проекта.</p>
+        </article>
+        <article class="roadmap-item roadmap-item--done">
+          <time>v0.9</time>
+          <b>Диагностика и loaders</b>
+          <p>Deep QA, выбор версии loader, retry API, валидация сборок и headless-проверка UI.</p>
+        </article>
+        <article class="roadmap-item roadmap-item--done">
+          <time>v1.0</time>
+          <b>Стабильный релиз</b>
+          <p>Финальная полировка лаунчера, updater, релизных сборок и сайта проекта.</p>
+        </article>
+        <article class="roadmap-item roadmap-item--done">
+          <time>v1.1.0</time>
+          <b>Ely.by и темы</b>
+          <p>OAuth Ely.by, полноэкранные темы, CustomSkinLoader, адаптивный профиль и прогресс запуска.</p>
+        </article>
+        <article class="roadmap-item roadmap-item--done">
+          <time>v1.1.1</time>
+          <b>Полировка UX</b>
+          <p>Усиленная прокрутка как в Windows, Ely.by OAuth и обновление сайта.</p>
+        </article>
+        <article class="roadmap-item roadmap-item--current">
+          <time>v1.1.4.2</time>
+          <b>v1.1.4.2 — полировка UX</b>
+          <p>Адаптация свернутой панели, объёмный preview скина и обновление релизных артефактов.</p>
+          <span class="roadmap-current">Текущая версия</span>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>
+      <b>Nexus Launcher</b>
+      <span>v<span id="footerVersion">1.1.4.2</span> · fix · Windows</span>
+    </div>
+    <nav>
+      <a href="privacy.html">Privacy</a>
+      <a href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher">GitHub</a>
+      <a href="#top">Наверх</a>
+    </nav>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
+

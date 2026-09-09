@@ -1,0 +1,11 @@
+version: 5.0.0-beta
+runtime:
+  mode: ultimate
+agents:
+  enabled: true
+memory:
+  enabled: true
+security:
+  sandbox: true
+models:
+  routing: adaptive

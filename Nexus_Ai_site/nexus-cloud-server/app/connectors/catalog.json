@@ -1,0 +1,166 @@
+{
+  "categories": [
+    { "id": "connected", "label": "Подключено" },
+    { "id": "popular", "label": "Популярное" },
+    { "id": "developer", "label": "Разработчик" },
+    { "id": "productivity", "label": "Продуктивность" },
+    { "id": "communication", "label": "Коммуникация" },
+    { "id": "data", "label": "Данные и аналитика" }
+  ],
+  "connectors": [
+    {
+      "id": "google_workspace",
+      "name": "Gmail with Calendar",
+      "description": "Поиск по письмам и событиям календаря",
+      "category": "popular",
+      "icon": "google",
+      "auth_type": "oauth",
+      "mvp": true,
+      "coming_soon": false,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Репозитории, файлы и issues",
+      "category": "developer",
+      "icon": "github",
+      "auth_type": "oauth",
+      "mvp": true,
+      "coming_soon": false,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "description": "Проекты, деплои и документация",
+      "category": "developer",
+      "icon": "vercel",
+      "auth_type": "oauth",
+      "mvp": true,
+      "coming_soon": false,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "description": "Отправка сообщений в канал через вебхук",
+      "category": "communication",
+      "icon": "discord",
+      "auth_type": "webhook",
+      "mvp": true,
+      "coming_soon": false,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "outlook",
+      "name": "Outlook",
+      "description": "Поиск по письмам и календарю",
+      "category": "popular",
+      "icon": "microsoft",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "description": "CRM: контакты, сделки, задачи",
+      "category": "popular",
+      "icon": "hubspot",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "description": "База данных, auth и storage",
+      "category": "popular",
+      "icon": "supabase",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "description": "Платежи и подписки",
+      "category": "popular",
+      "icon": "stripe",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "PRO"
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "description": "Задачи и проекты",
+      "category": "developer",
+      "icon": "linear",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "description": "Ошибки и performance",
+      "category": "developer",
+      "icon": "sentry",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "HOBBY"
+    },
+    {
+      "id": "atlassian",
+      "name": "Atlassian",
+      "description": "Jira и Confluence",
+      "category": "productivity",
+      "icon": "atlassian",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Страницы и базы данных",
+      "category": "productivity",
+      "icon": "notion",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Каналы и сообщения",
+      "category": "communication",
+      "icon": "slack",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    },
+    {
+      "id": "google_analytics",
+      "name": "Google Analytics",
+      "description": "Аналитика сайта и приложений",
+      "category": "data",
+      "icon": "google",
+      "auth_type": "oauth",
+      "mvp": false,
+      "coming_soon": true,
+      "required_tier": "STANDARD"
+    }
+  ]
+}

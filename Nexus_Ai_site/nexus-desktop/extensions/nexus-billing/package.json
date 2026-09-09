@@ -1,0 +1,32 @@
+{
+  "name": "nexus-billing",
+  "displayName": "Nexus Billing",
+  "description": "Subscription tier and monthly AI pool status",
+  "version": "1.2.0",
+  "publisher": "nexus",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "extensionDependencies": ["nexus.nexus-auth"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nexus.openPricing",
+        "title": "Nexus: Open Pricing",
+        "category": "Nexus"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nexus",
+          "title": "Nexus",
+          "icon": "media/brand/icon.png"
+        }
+      ]
+    },
+    "menus": {}
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+renderer-dist/
+dist/
+dist-build/
+dist-out*/
+*.exe
+*.7z
+*.blockmap
+win-unpacked/
+*.log

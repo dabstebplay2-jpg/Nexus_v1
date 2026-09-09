@@ -1,0 +1,50 @@
+version: 7
+accounts:
+- id: gpt5
+  name: GPT-5 Provider
+  provider: openai_compatible
+  base_url: https://api.polza.ai/v1
+  api_key_ref: null
+  api_key_env: POLZA_API_KEY
+  status: unknown
+  metadata: {}
+- id: qwen
+  name: Qwen 0.5B Provider
+  provider: ollama
+  base_url: null
+  api_key_ref: null
+  api_key_env: null
+  status: unknown
+  metadata: {}
+- id: claude
+  name: Claude Sonnet Provider
+  provider: anthropic
+  base_url: null
+  api_key_ref: null
+  api_key_env: null
+  status: unknown
+  metadata: {}
+- id: gemini
+  name: Gemini Pro Provider
+  provider: gemini
+  base_url: null
+  api_key_ref: null
+  api_key_env: null
+  status: unknown
+  metadata: {}
+- id: lmstudio
+  name: Local LM Studio Provider
+  provider: lmstudio
+  base_url: http://localhost:1234/v1
+  api_key_ref: null
+  api_key_env: null
+  status: unknown
+  metadata: {}
+- id: polza
+  name: OpenAI Compatible (polza)
+  provider: openai_compatible
+  base_url: https://api.polza.ai/v1
+  api_key_ref: provider:polza
+  api_key_env: null
+  status: online
+  metadata: {}

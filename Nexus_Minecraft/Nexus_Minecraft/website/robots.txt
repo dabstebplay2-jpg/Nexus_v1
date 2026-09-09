@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://dabstebplay2-jpg.github.io/Nexus_mincraft_laucher/sitemap.xml

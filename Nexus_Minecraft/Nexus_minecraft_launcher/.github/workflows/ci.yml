@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  python-check:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile check
+        shell: pwsh
+        run: |
+          @'
+          import py_compile
+          from pathlib import Path
+
+          errors = []
+          for path in Path(".").rglob("*.py"):
+              if ".venv" in path.parts or "__pycache__" in path.parts:
+                  continue
+              try:
+                  py_compile.compile(str(path), doraise=True)
+              except Exception as error:
+                  errors.append((str(path), str(error)))
+
+          print(f"Checked Python files. Errors: {len(errors)}")
+          for file, error in errors:
+              print(file, error)
+
+          raise SystemExit(1 if errors else 0)
+          '@ | python -

@@ -1,0 +1,79 @@
+# Blueprint: Web + PostgreSQL or Upstash (see docs/PERSISTENT_DATABASE_RU.md)
+services:
+  - type: web
+    name: nexus-cloud
+    runtime: python
+    buildCommand: cd admin_ui && npm ci && npm run build && test -f dist/index.html && cd .. && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.11"
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: NEXUS_CLOUD_SECRET_KEY
+        generateValue: true
+      - key: POLZA_BACKEND_API_KEY
+        sync: false
+      - key: POLZA_MCP_TOKEN
+        sync: false
+      - key: POLZA_OAUTH_CALLBACK_URL
+        value: https://nexus-cloud-bxcc.onrender.com/v1/auth/polza/callback
+      - key: POLZA_APP_NAME
+        value: Nexus
+      - key: NEXUS_BILLING_TEST_MODE
+        value: "false"
+      - key: NEXUS_TIER_POOL_FRACTION
+        value: "0.92"
+      - key: NEXUS_DAILY_ABUSE_CAP_FRACTION
+        value: "0"
+      - key: NEXUS_TESTING_MODE
+        value: "false"
+      - key: NEXUS_CORS_ORIGINS
+        value: https://nexus-zeta-ruby-12.vercel.app
+      - key: NEXUS_REMOTE_ADMIN
+        sync: false
+      - key: NEXUS_ADMIN_PASSWORD
+        sync: false
+      - key: NEXUS_ADMIN_GRANT_KEY
+        sync: false
+      - key: NEXUS_CLOUD_DATABASE_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: DISCORD_OPS_WEBHOOK_URL
+        sync: false
+      - key: NEXUS_CRON_SECRET
+        generateValue: true
+
+  - type: cron
+    name: nexus-polza-balance
+    runtime: python
+    schedule: "0 * * * *"
+    buildCommand: cd admin_ui && npm ci && npm run build && test -f dist/index.html && cd .. && pip install -r requirements.txt
+    startCommand: python scripts/cron_polza_balance_check.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.11"
+      - key: NEXUS_CLOUD_DATABASE_URL
+        fromService:
+          name: nexus-cloud
+          type: web
+          envVarKey: NEXUS_CLOUD_DATABASE_URL
+      - key: POLZA_BACKEND_API_KEY
+        fromService:
+          name: nexus-cloud
+          type: web
+          envVarKey: POLZA_BACKEND_API_KEY
+      - key: POLZA_MCP_TOKEN
+        fromService:
+          name: nexus-cloud
+          type: web
+          envVarKey: POLZA_MCP_TOKEN
+      - key: DISCORD_OPS_WEBHOOK_URL
+        fromService:
+          name: nexus-cloud
+          type: web
+          envVarKey: DISCORD_OPS_WEBHOOK_URL

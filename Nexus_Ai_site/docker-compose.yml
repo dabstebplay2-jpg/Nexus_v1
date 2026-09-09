@@ -1,0 +1,36 @@
+# Nexus Pro: cloud + backend на одном VPS
+# Запуск: cp deploy/env.example deploy/.env  →  заполните  →  docker compose up -d --build
+
+services:
+  cloud:
+    build: ./nexus-cloud-server
+    restart: unless-stopped
+    env_file: deploy/.env
+    environment:
+      NEXUS_CLOUD_DATABASE_URL: sqlite:////data/nexus_cloud_v2.db
+    volumes:
+      - cloud_data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: deploy/.env
+    environment:
+      NEXUS_CLOUD_SERVER_URL: http://cloud:8080
+    ports:
+      # The IDE backend exposes terminal and filesystem tools. Never publish it
+      # on a public interface; the browser UI reaches it from this host only.
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      cloud:
+        condition: service_healthy
+
+volumes:
+  cloud_data:

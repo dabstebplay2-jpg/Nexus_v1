@@ -1,0 +1,286 @@
+import type { AgentSession, ToolCall, Turn } from "../domain/types"
+import type { EventSink, Provider, Store } from "../domain/ports"
+import type { ContextManager } from "../context/manager"
+import type { ToolRegistry } from "../tools/registry"
+import type { ToolExecutor } from "../tools/executor"
+import type { VerificationEngine } from "../verification/engine"
+import { completionPolicy } from "../completion/policy"
+import { loopGuard } from "../loop-guard/policy"
+import { promote } from "../session/inbox"
+import { recover } from "../recovery/policy"
+import { fingerprint } from "../tools/workspace"
+import { abort, errorText, NexusError, createDeadline } from "../shared/errors"
+import { bound, redact, safeJson } from "../shared/redact"
+import { publish, transition } from "./state"
+
+export type LoopDependencies = {
+  store: Store
+  provider: Provider
+  context: ContextManager
+  registry: ToolRegistry
+  executor: ToolExecutor
+  verification: VerificationEngine
+  emit: EventSink
+}
+export class AgentLoop {
+  private readonly active = new Map<string, Promise<AgentSession>>()
+  constructor(private readonly deps: LoopDependencies) {}
+  run(id: string, signal: AbortSignal = new AbortController().signal) {
+    const running = this.active.get(id)
+    if (running) return running
+    const execution = this.drain(id, signal).finally(() => this.active.delete(id))
+    this.active.set(id, execution)
+    return execution
+  }
+  private async drain(id: string, signal: AbortSignal) {
+    const session = this.deps.store.get(id)
+    const release = this.deps.store.acquire(id, session.workspace)
+    const started = Date.now()
+    const elapsed = session.activeMs
+    const deadline = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(Math.max(1, session.budgets.maxDurationMs - elapsed)),
+    ])
+    const move = (status: AgentSession["status"], reason = "") =>
+      transition(this.deps.store, session, status, this.deps.emit, reason)
+    try {
+      move("RECOVERING")
+      const unknown = await recover(session, this.deps.store)
+      if (unknown.length) {
+        session.decision = {
+          outcome: "BLOCKED",
+          reason: "Inspect uncertain side effects with inspect-session/resolve-action; nothing was replayed",
+          missing: unknown.map((action) => action.id),
+        }
+        publish(this.deps.store, session, this.deps.emit, "recovery", session.decision)
+        move("FAILED", session.decision.reason)
+        return session
+      }
+      session.errors = []
+      const reproduction = session.contract.criteria
+        .filter((criterion) => criterion.baseline && criterion.checkId)
+        .map((criterion) => criterion.checkId!)
+      if (
+        reproduction.length &&
+        !this.deps.store
+          .list("evidence", id)
+          .some(
+            (item) =>
+              item.source === "verification" &&
+              item.verdict === "fail" &&
+              reproduction.includes(String(item.metadata.checkId)) &&
+              item.fingerprint === session.contract.baselineFingerprint,
+          )
+      ) {
+        move("VERIFYING", "Reproduce the reported failure before changing files")
+        await this.deps.verification.run(
+          session,
+          deadline,
+          () => move("WAITING_PERMISSION", "reproduction"),
+          reproduction,
+        )
+        if (session.status === "WAITING_PERMISSION") move("VERIFYING")
+        move("RECOVERING")
+      }
+      move("UNDERSTANDING")
+      move("PLANNING")
+      while (true) {
+        abort(deadline)
+        session.activeMs = elapsed + Date.now() - started
+        promote(this.deps.store, session, "STEER")
+        const guard = loopGuard(session, this.deps.store.list("actions", id), this.deps.store.list("evidence", id))
+        if (guard) {
+          publish(this.deps.store, session, this.deps.emit, "loop_guard", guard)
+          if (guard.action === "STOP") {
+            session.decision = { outcome: "BLOCKED", reason: guard.reason, missing: [] }
+            move("FAILED", guard.reason)
+            break
+          }
+          if (guard.action === "COMPACT_CONTEXT") this.deps.context.compact(session)
+          session.conversation.push({
+            role: "system",
+            content: `${guard.action}: ${guard.reason}. Choose a different action; do not repeat the loop.`,
+          })
+        }
+        move("ACTING")
+        const snapshot = this.deps.registry.capture()
+        const specs = session.contract.mode === "answer" ? [] : snapshot.specs
+        const messages = await this.deps.context.build(session, Buffer.byteLength(safeJson(specs)))
+        const turn: Turn = {
+          id: crypto.randomUUID(),
+          sessionId: id,
+          number: ++session.turns,
+          status: "STARTED",
+          contextChars: safeJson(messages).length,
+          model: session.model.model,
+        }
+        this.deps.store.transaction(() => {
+          this.deps.store.put("turns", turn)
+          this.deps.store.save(session)
+        })
+        publish(this.deps.store, session, this.deps.emit, "model_request", {
+          turn: turn.number,
+          model: turn.model,
+          contextChars: turn.contextChars,
+          epoch: session.epoch,
+        })
+        const calls: ToolCall[] = []
+        const parts: string[] = []
+        const streamState = { finished: false }
+        const providerDeadline = createDeadline(deadline, session.budgets.providerTimeoutMs)
+        try {
+          for await (const event of this.deps.provider.stream({
+            model: session.model,
+            messages,
+            tools: specs,
+            maxTokens: session.budgets.maxOutputTokens,
+            signal: providerDeadline.signal,
+          })) {
+            abort(deadline)
+            if (event.type === "text") {
+              parts.push(event.text)
+              if (parts.join("").length > 1000000) throw new NexusError("OUTPUT_LIMIT", "Provider output too large")
+            }
+            if (event.type === "tool") calls.push(event.call)
+            if (event.type === "finish") streamState.finished = true
+            if (event.type === "usage") publish(this.deps.store, session, this.deps.emit, "usage", event)
+          }
+          if (!streamState.finished) throw new NexusError("PROTOCOL", "Incomplete provider turn")
+          if (new Set(calls.map((call) => call.id)).size !== calls.length || calls.length > 64)
+            throw new NexusError("PROTOCOL", "Duplicate or excessive tool calls")
+          const priorIds = new Set(
+            session.conversation.flatMap((message) => message.toolCalls ?? []).map((call) => call.id),
+          )
+          if (calls.some((call) => priorIds.has(call.id)))
+            throw new NexusError("PROTOCOL", "Tool call ID was already used in an earlier turn")
+          if (calls.length && (session.contract.mode === "answer" || !session.model.capabilities.toolCalling))
+            throw new NexusError("CAPABILITY", "Tools are unavailable in this mode/model")
+          turn.status = "SUCCEEDED"
+        } catch (error) {
+          turn.status = "FAILED"
+          turn.error = redact(errorText(error))
+          this.deps.store.put("turns", turn)
+          if (error instanceof NexusError && error.code === "CONTEXT_OVERFLOW" && session.epoch < 3) {
+            this.deps.context.compact(session)
+            move("RECOVERING", error.message)
+            continue
+          }
+          throw error
+        } finally {
+          providerDeadline.close()
+        }
+        this.deps.store.put("turns", turn)
+        session.conversation.push({
+          role: "assistant",
+          content: redact(parts.join("")),
+          ...(calls.length ? { toolCalls: JSON.parse(safeJson(calls)) as ToolCall[] } : {}),
+        })
+        this.deps.store.save(session)
+        for (const call of calls) {
+          abort(deadline)
+          if (session.toolCount >= session.budgets.maxTools) throw new NexusError("BUDGET", "Tool budget exhausted")
+          const result = await this.deps.executor.execute(
+            session,
+            turn.id,
+            call,
+            snapshot.resolve(call.name),
+            deadline,
+            () => move("WAITING_PERMISSION", call.name),
+          )
+          session.conversation.push({ role: "tool", toolCallId: call.id, content: result.output })
+          this.deps.store.save(session)
+          publish(this.deps.store, session, this.deps.emit, "tool", {
+            name: call.name,
+            actionId: result.action.id,
+            status: result.action.status,
+            output: bound(result.output, 1600).text,
+          })
+          if (result.action.status === "UNKNOWN")
+            throw new NexusError("UNKNOWN_EFFECT", "Side effect has uncertain outcome; inspect before resuming")
+          if (session.status === "WAITING_PERMISSION") move("ACTING")
+        }
+        move("OBSERVING")
+        if (calls.length) continue
+        move("VERIFYING")
+        if (session.contract.mode === "answer" && parts.join("").trim())
+          this.deps.store.put("evidence", {
+            id: crypto.randomUUID(),
+            sessionId: id,
+            source: "core",
+            timestamp: Date.now(),
+            kind: "GOAL_ASSERTION",
+            command: "answer-delivered",
+            expected: "Non-empty response",
+            actual: parts.join(""),
+            verdict: "pass",
+            metadata: { informational: true },
+            fingerprint: await fingerprint(session.workspace),
+            contractRevision: session.contract.revision,
+          })
+        const beforeVerification = completionPolicy(
+          session,
+          this.deps.store.list("actions", id),
+          this.deps.store.list("evidence", id),
+          await fingerprint(session.workspace),
+        )
+        if (session.contract.mode === "coding" && beforeVerification.outcome === "NEEDS_VERIFICATION")
+          await this.deps.verification.run(session, deadline, () => move("WAITING_PERMISSION", "verification"))
+        if (session.status === "WAITING_PERMISSION") move("VERIFYING")
+        session.decision = completionPolicy(
+          session,
+          this.deps.store.list("actions", id),
+          this.deps.store.list("evidence", id),
+          await fingerprint(session.workspace),
+        )
+        publish(this.deps.store, session, this.deps.emit, "completion", session.decision)
+        // Recheck durable admission after verification, which may have taken minutes.
+        if (promote(this.deps.store, session, "STEER")) {
+          move("ACTING")
+          continue
+        }
+        if (session.decision?.outcome === "COMPLETE") {
+          if (promote(this.deps.store, session, "QUEUE")) {
+            move("ACTING")
+            continue
+          }
+          move("COMPLETED", session.decision.reason)
+          break
+        }
+        if (["NEEDS_USER_INPUT", "BLOCKED"].includes(session.decision?.outcome ?? "")) {
+          move("FAILED", session.decision?.reason)
+          break
+        }
+        session.conversation.push({
+          role: "system",
+          content: `Completion rejected: ${safeJson(session.decision)}. Inspect evidence, fix failures or finish your plan; then verify.`,
+        })
+        move("RECOVERING", "Completion rejected")
+      }
+    } catch (error) {
+      const message = redact(errorText(error))
+      session.errors.push(message)
+      session.decision = {
+        outcome: error instanceof NexusError && error.code.startsWith("PERMISSION") ? "NEEDS_USER_INPUT" : "BLOCKED",
+        reason: message,
+        missing: [],
+      }
+      publish(this.deps.store, session, this.deps.emit, "error", {
+        code: error instanceof NexusError ? error.code : "UNEXPECTED",
+        message,
+      })
+      move(
+        signal.aborted
+          ? "ABORTED"
+          : error instanceof NexusError && error.code === "PERMISSION_REQUIRED"
+            ? "WAITING_PERMISSION"
+            : "FAILED",
+        message,
+      )
+    } finally {
+      session.activeMs = elapsed + Date.now() - started
+      this.deps.store.save(session)
+      release()
+    }
+    return session
+  }
+}

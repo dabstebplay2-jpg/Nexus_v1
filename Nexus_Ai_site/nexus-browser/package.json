@@ -1,0 +1,89 @@
+{
+  "name": "nexus-browser",
+  "version": "0.4.1",
+  "description": "Nexus Browser — AI browser for Windows (standalone desktop app)",
+  "author": "Nexus",
+  "main": "main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5174 && electron .\"",
+    "build:renderer": "vite build",
+    "start": "electron .",
+    "start:packaged": "electron .",
+    "predist": "node scripts/generate-brand-icon.mjs && powershell -ExecutionPolicy Bypass -File scripts/clean-dist.ps1 -Phase before",
+    "postdist": "powershell -ExecutionPolicy Bypass -File scripts/clean-dist.ps1 -Phase after",
+    "dist": "npm run build:renderer && electron-builder --win",
+    "dist:portable": "npm run build:renderer && electron-builder --win portable",
+    "dist:setup": "npm run build:renderer && electron-builder --win nsis",
+    "dist:dir": "npm run build:renderer && electron-builder --win dir"
+  },
+  "build": {
+    "appId": "ai.nexus.browser",
+    "productName": "Nexus Browser",
+    "icon": "product/brand/icon.ico",
+    "afterPack": "scripts/after-pack.cjs",
+    "directories": {
+      "output": "dist",
+      "buildResources": "product/brand"
+    },
+    "files": [
+      "main/**/*",
+      "preload/**/*",
+      "renderer-dist/**/*",
+      "product/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "NexusBrowser-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Nexus Browser",
+      "installerIcon": "product/brand/icon.ico",
+      "uninstallerIcon": "product/brand/icon.ico",
+      "artifactName": "NexusBrowser-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "NexusBrowser-${version}-Portable.exe"
+    },
+    "extraMetadata": {
+      "main": "main/index.js"
+    }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^8.2.2",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.1",
+    "rcedit": "^5.0.2",
+    "vite": "^8.1.4",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "^2.18.0",
+    "cross-fetch": "^4.1.0",
+    "electron-chrome-extensions": "^4.9.0",
+    "electron-chrome-web-store": "^0.13.0",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^0.359.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0"
+  }
+}

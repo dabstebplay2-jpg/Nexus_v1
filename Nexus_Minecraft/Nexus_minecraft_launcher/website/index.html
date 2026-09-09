@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Launcher — Minecraft лаунчер для Windows</title>
+    <meta name="description" content="Nexus Launcher — современный Minecraft лаунчер для Windows. Сборки, моды, шейдеры и обновления — всё в одном.">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-grid"></div>
+    <div class="cursor-glow"></div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container header-content">
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <img src="assets/logo.svg" alt="Nexus Launcher Logo">
+                </div>
+                <span>Nexus Launcher</span>
+            </a>
+            <nav class="nav">
+                <a href="#features">Возможности</a>
+                <a href="#builder">Сборки</a>
+                <a href="#download">Скачать</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <div class="header-actions">
+                <a href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher" target="_blank" class="btn-icon" aria-label="GitHub">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.69-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.78 1.05.78 2.12 0 1.53-.01 2.76-.01 3.14 0 .31.21.67.8.56 4.56-1.53 7.85-5.84 7.85-10.91C23.5 5.65 18.35.5 12 .5z"/></svg>
+                </a>
+                <button id="themeToggle" class="btn-icon" aria-label="Сменить тему">
+                    <span class="theme-icon-dark">☀</span>
+                    <span class="theme-icon-light">☾</span>
+                </button>
+                <a href="#download" class="btn btn-primary btn-sm">Скачать</a>
+                <button id="burgerMenu" class="burger-menu" aria-label="Меню">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+        <div class="mobile-menu">
+            <a href="#features">Возможности</a>
+            <a href="#builder">Сборки</a>
+            <a href="#download">Скачать</a>
+            <a href="#faq">FAQ</a>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="container hero-grid">
+            <div class="hero-text">
+                <div class="status-badge reveal">
+                    <span class="pulse-dot"></span>
+                    Online • v<span id="versionStat">0.7.13</span>
+                </div>
+                <h1 class="hero-title reveal">Nexus <span class="text-gradient">Launcher</span></h1>
+                <p class="hero-subtitle reveal">Minecraft лаунчер для Windows. Сборки, моды, шейдеры и обновления — всё в одном.</p>
+                <div class="hero-actions reveal">
+                    <a href="#download" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Скачать для Windows
+                    </a>
+                    <a href="#features" class="btn btn-ghost">Что умеет?</a>
+                </div>
+            </div>
+            <div class="hero-visual reveal">
+                <div class="mockup-3d-wrap">
+                    <div class="mockup-window tilt-card">
+                        <div class="window-header">
+                            <div class="dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <div class="window-title">NexusLauncher.exe</div>
+                        </div>
+                        <div class="window-body">
+                            <div class="mockup-sidebar">
+                                <div class="ms-item active"></div>
+                                <div class="ms-item"></div>
+                                <div class="ms-item"></div>
+                                <div class="ms-item"></div>
+                            </div>
+                            <div class="mockup-content">
+                                <div class="mc-card large"></div>
+                                <div class="mc-row">
+                                    <div class="mc-card small"></div>
+                                    <div class="mc-card small"></div>
+                                </div>
+                                <div class="mc-btn"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container hero-stats">
+            <div class="stat-card reveal">
+                <span class="stat-val" id="versionText">v0.7.13</span>
+                <span class="stat-label">Текущая версия</span>
+            </div>
+            <div class="stat-card reveal">
+                <span class="stat-val">1 клик</span>
+                <span class="stat-label">Установка</span>
+            </div>
+            <div class="stat-card reveal">
+                <span class="stat-val">Modrinth</span>
+                <span class="stat-label">Интеграция</span>
+            </div>
+            <div class="stat-card reveal">
+                <span class="stat-val">Setup</span>
+                <span class="stat-label">.exe & .zip</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Возможности</h2>
+            <div class="features-grid">
+                <div class="feature-card reveal">
+                    <div class="feature-icon"><img src="assets/cube.svg" alt="Сборки"></div>
+                    <h3>Сборки</h3>
+                    <p>Готовые пресеты с модами для любого стиля игры. Ванилла, выживание, PvP — настрой в один клик.</p>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon"><img src="assets/mods.svg" alt="Моды"></div>
+                    <h3>Моды</h3>
+                    <p>Прямая интеграция с Modrinth. Поиск, установка и обновление модов без лишних движений.</p>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon"><img src="assets/speed.svg" alt="Шейдеры"></div>
+                    <h3>Шейдеры</h3>
+                    <p>Поддержка Iris и OptiFine. Делай мир красивым с топовыми шейдерами прямо из лаунчера.</p>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon"><img src="assets/update.svg" alt="Обновления"></div>
+                    <h3>Обновления</h3>
+                    <p>Автоматическое обновление клиента. Ты всегда играешь в последнюю версию без танцев с бубном.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SMART BUILDER -->
+    <section id="builder" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Собери идеальную сборку за секунду</h2>
+            <div class="builder-grid">
+                <div class="builder-tabs reveal">
+                    <button class="tab-btn active" data-preset="fps">
+                        <span class="tab-icon">🚀</span>
+                        <span class="tab-name">FPS Boost</span>
+                    </button>
+                    <button class="tab-btn" data-preset="beauty">
+                        <span class="tab-icon">✨</span>
+                        <span class="tab-name">Beautiful</span>
+                    </button>
+                    <button class="tab-btn" data-preset="vanilla">
+                        <span class="tab-icon">🌿</span>
+                        <span class="tab-name">Vanilla+</span>
+                    </button>
+                    <button class="tab-btn" data-preset="survival">
+                        <span class="tab-icon">⚔️</span>
+                        <span class="tab-name">Survival</span>
+                    </button>
+                </div>
+                <div class="builder-output reveal" id="presetOutput">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- GALLERY -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Интерфейс</h2>
+            <div class="gallery-grid">
+                <div class="gallery-card reveal">
+                    <div class="g-mockup">
+                        <div class="g-sidebar"><div class="g-item active"></div><div class="g-item"></div></div>
+                        <div class="g-content"><div class="g-title"></div><div class="g-grid"><div class="g-block"></div><div class="g-block"></div></div></div>
+                    </div>
+                    <h3>Главная</h3>
+                    <p>Сборки и быстрые действия в одном месте.</p>
+                </div>
+                <div class="gallery-card reveal">
+                    <div class="g-mockup">
+                        <div class="g-sidebar"><div class="g-item"></div><div class="g-item active"></div></div>
+                        <div class="g-content"><div class="g-title"></div><div class="g-search"></div><div class="g-grid"><div class="g-block"></div><div class="g-block"></div><div class="g-block"></div></div></div>
+                    </div>
+                    <h3>Моды</h3>
+                    <p>Удобный поиск, фильтры и карточки модов.</p>
+                </div>
+                <div class="gallery-card reveal">
+                    <div class="g-mockup">
+                        <div class="g-sidebar"><div class="g-item"></div><div class="g-item"></div></div>
+                        <div class="g-content"><div class="g-title"></div><div class="g-profile"><div class="g-avatar"></div><div class="g-info"></div></div></div>
+                    </div>
+                    <h3>Профиль</h3>
+                    <p>Аккаунты, скины и настройки безопасности.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download" class="section">
+        <div class="container download-container">
+            <h2 class="section-title reveal">Скачать</h2>
+            <div class="os-tabs reveal">
+                <div class="os-tab active">Windows</div>
+                <div class="os-tab disabled">macOS <span>soon</span></div>
+                <div class="os-tab disabled">Linux <span>soon</span></div>
+            </div>
+            <div class="download-card reveal">
+                <a id="dlSetup" href="#" class="btn btn-primary btn-block">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Скачать Setup .exe
+                </a>
+                <a id="dlPortable" href="#" class="btn btn-secondary btn-block">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Скачать Portable .zip
+                </a>
+                <button id="copyLink" class="btn btn-ghost btn-block">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Скопировать ссылку
+                </button>
+                <div class="file-info">
+                    <div>Файл: <span id="fileName">NexusLauncherSetup-0.7.13-win-x64.exe</span></div>
+                    <div>Релиз: <span class="version-date"></span></div>
+                </div>
+                <div class="disclaimer">
+                    Если Windows SmartScreen выдаст предупреждение, нажмите "Подробнее" -> "Выполнить в любом случае". Это происходит потому, что приложение не имеет цифровой подписи.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ROADMAP -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Дорожная карта</h2>
+            <div class="roadmap reveal">
+                <div class="rm-line"></div>
+                <div class="rm-points">
+                    <div class="rm-point">
+                        <div class="rm-dot"></div>
+                        <span class="rm-version">v0.7.1</span>
+                        <span class="rm-desc">EXE</span>
+                    </div>
+                    <div class="rm-point">
+                        <div class="rm-dot"></div>
+                        <span class="rm-version">v0.7.2</span>
+                        <span class="rm-desc">Installer</span>
+                    </div>
+                    <div class="rm-point">
+                        <div class="rm-dot"></div>
+                        <span class="rm-version">v0.7.10</span>
+                        <span class="rm-desc">Tracked hook fix</span>
+                    </div>
+                    <div class="rm-point active">
+                        <div class="rm-dot"></div>
+                        <span class="rm-version">v0.7.13</span>
+                        <span class="rm-desc">★ Сейчас</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Частые вопросы</h2>
+            <div class="faq-container reveal">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        Это официальный лаунчер? <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer"><p>Нет, это неофициальный проект, созданный энтузиастами для удобного запуска Minecraft с модами.</p></div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        Куда ставится программа? <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer"><p>По умолчанию программа устанавливается в папку %APPDATA% на вашем компьютере.</p></div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        Как обновляться? <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer"><p>Обновления можно скачивать вручную из GitHub Releases, либо использовать систему автообновления внутри самого лаунчера.</p></div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        Нужна ли учётка Microsoft? <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer"><p>Да, для запуска игры требуется аккаунт Microsoft, так как мы соблюдаем правила Mojang и Microsoft.</p></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- COMMUNITY -->
+    <section class="section">
+        <div class="container community-container reveal">
+            <h2 class="section-title">Присоединяйся к сообществу</h2>
+            <div class="community-grid">
+                <a href="#" class="com-card">
+                    <div class="com-icon">🎮</div>
+                    <span class="com-name">Discord</span>
+                    <span class="com-count">1.2k участников</span>
+                </a>
+                <a href="#" class="com-card">
+                    <div class="com-icon">✈️</div>
+                    <span class="com-name">Telegram</span>
+                    <span class="com-count">850 подписчиков</span>
+                </a>
+                <a href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher" target="_blank" class="com-card">
+                    <div class="com-icon">🐙</div>
+                    <span class="com-name">GitHub</span>
+                    <span class="com-count">120 звезд</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container footer-grid">
+            <div class="footer-brand">
+                <a href="#" class="logo">
+                    <div class="logo-icon"><img src="assets/logo.svg" alt="Nexus Launcher Logo"></div>
+                    <span>Nexus Launcher</span>
+                </a>
+                <p class="footer-version">Версия <span id="footerVersion">0.7.13</span></p>
+            </div>
+            <div class="footer-links">
+                <div class="fl-col">
+                    <h4>Продукт</h4>
+                    <a href="#features">Возможности</a>
+                    <a href="#download">Скачать</a>
+                    <a href="#faq">FAQ</a>
+                </div>
+                <div class="fl-col">
+                    <h4>Проект</h4>
+                    <a href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher" target="_blank">GitHub</a>
+                    <a href="https://github.com/dabstebplay2-jpg/Nexus_mincraft_laucher/releases" target="_blank">Releases</a>
+                </div>
+                <div class="fl-col">
+                    <h4>Сообщество</h4>
+                    <a href="#">Discord</a>
+                    <a href="#">Telegram</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="container">
+                <p>Неофициальный проект. Не связан с Mojang или Microsoft.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

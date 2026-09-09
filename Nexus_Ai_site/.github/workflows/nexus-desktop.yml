@@ -1,0 +1,126 @@
+name: Nexus Desktop
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'nexus-desktop/**'
+      - '.github/workflows/nexus-desktop.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'nexus-desktop/**'
+      - '.github/workflows/nexus-desktop.yml'
+    tags:
+      - 'desktop-v*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate product.json
+        run: |
+          python -c "import json; json.load(open('nexus-desktop/product/product.json'))"
+          echo "product.json OK"
+
+      - name: Validate extension manifests
+        run: |
+          for d in nexus-desktop/extensions/*/; do
+            test -f "$d/package.json" || (echo "missing package.json in $d" && exit 1)
+            python -c "import json; json.load(open('${d}package.json'))"
+            echo "OK $(basename $d)"
+          done
+
+      - name: Validate extension JavaScript
+        run: find nexus-desktop/extensions -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Test Nexus AI safety helpers
+        run: npm --prefix nexus-desktop/extensions/nexus-ai test
+
+  package-extensions:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package Nexus extensions as VSIX
+        run: |
+          mkdir -p nexus-desktop/dist
+          for d in nexus-desktop/extensions/*/; do
+            name=$(basename "$d")
+            (cd "$d" && vsce package --no-dependencies -o "../../dist/${name}.vsix")
+          done
+          ls -la nexus-desktop/dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexus-extensions-vsix
+          path: nexus-desktop/dist/*.vsix
+
+  build-windows:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: windows-latest
+    timeout-minutes: 180
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare VSCodium tree
+        shell: pwsh
+        run: nexus-desktop/scripts/prepare.ps1
+
+      - name: Build Nexus IDE
+        shell: bash
+        working-directory: nexus-desktop/vscodium
+        run: |
+          export SHOULD_BUILD=yes
+          export VSCODE_ARCH=x64
+          export OS_NAME=windows
+          ./dev/build.sh
+
+      - name: Package portable ZIP
+        shell: pwsh
+        run: nexus-desktop/scripts/package-release.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexus-ide-windows-x64
+          path: |
+            nexus-desktop/dist/NexusIDE-win32-x64.zip
+            nexus-desktop/vscodium/VSCode-win32-x64/
+            nexus-desktop/vscodium/*.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-latest
+    needs: build-windows
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nexus-ide-windows-x64
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/NexusIDE-win32-x64.zip

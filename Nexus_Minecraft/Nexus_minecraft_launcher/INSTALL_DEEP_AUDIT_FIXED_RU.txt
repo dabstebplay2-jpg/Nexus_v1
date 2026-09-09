@@ -1,0 +1,22 @@
+Как поставить Deep Audit Fixed 0.7.5:
+
+1. Закрой Nexus Launcher и Minecraft.
+2. Сделай бэкап:
+   Copy-Item -Recurse -Force .\data .\data_backup_before_deep_audit_fix
+
+3. Распакуй архив.
+4. Скопируй содержимое папки Nexus_minecraft_launcher_DEEP_AUDIT_FIXED в:
+   C:\Nexus_minecraft_launcher
+   с заменой файлов.
+
+5. Очисти Python-кэш:
+   Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+
+6. Проверь проект:
+   .\.venv\Scripts\python.exe .\tools\deep_qa.py
+
+7. Запусти лаунчер:
+   .\.venv\Scripts\python.exe main.py
+
+8. Собери релиз 0.7.5:
+   powershell -ExecutionPolicy Bypass -File .\scripts\build_full_release.ps1

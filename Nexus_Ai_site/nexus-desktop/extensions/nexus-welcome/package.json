@@ -1,0 +1,62 @@
+{
+  "name": "nexus-welcome",
+  "displayName": "Nexus Welcome",
+  "description": "First-run guide and recommended extensions",
+  "version": "1.1.0",
+  "publisher": "nexus",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "extensionDependencies": ["nexus.nexus-auth"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nexus.showWelcome",
+        "title": "Nexus: Welcome",
+        "category": "Nexus"
+      }
+    ],
+    "configurationDefaults": {
+      "editor.minimap.enabled": true,
+      "editor.fontSize": 14,
+      "files.autoSave": "afterDelay",
+      "workbench.colorTheme": "Default Dark Modern"
+    },
+    "walkthroughs": [
+      {
+        "id": "nexus.welcome",
+        "title": "Nexus IDE",
+        "description": "Начало работы с Nexus IDE",
+        "steps": [
+          {
+            "id": "signIn",
+            "title": "Войти в аккаунт",
+            "description": "Подключите облако Nexus для ИИ и подписок.",
+            "completionEvents": ["onCommand:nexus.signInGoogle"],
+            "media": {
+              "image": "media/brand/logo/brand.png",
+              "altText": "Nexus",
+              "markdown": "Команда палитры: **Nexus: Sign In with Google**"
+            }
+          },
+          {
+            "id": "extensions",
+            "title": "Расширения OpenVSX",
+            "description": "Установите ESLint, Prettier, Python и др. из OpenVSX (Ctrl+Shift+X).",
+            "completionEvents": ["onView:workbench.view.extensions"],
+            "media": { "markdown": "Маркетплейс: [OpenVSX](https://open-vsx.org)" }
+          },
+          {
+            "id": "aiChat",
+            "title": "AI Chat",
+            "description": "Откройте панель Nexus → AI Chat.",
+            "completionEvents": ["onView:nexus.aiChat"],
+            "media": { "markdown": "Требуется тариф **Hobby** или выше." }
+          }
+        ]
+      }
+    ]
+  }
+}

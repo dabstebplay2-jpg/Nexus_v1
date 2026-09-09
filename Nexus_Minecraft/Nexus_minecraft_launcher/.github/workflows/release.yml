@@ -1,0 +1,70 @@
+name: Build Windows EXE and Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Build Windows release assets
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies and build EXE/portable
+        shell: pwsh
+        run: |
+          .\scripts\build_release.ps1 -Python python -SkipVenv
+        env:
+          NEXUS_GITHUB_OWNER: ${{ github.repository_owner }}
+          NEXUS_GITHUB_REPO: ${{ github.event.repository.name }}
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          .\scripts\build_installer.ps1 -Python python -SkipReleaseBuild
+        env:
+          NEXUS_GITHUB_OWNER: ${{ github.repository_owner }}
+          NEXUS_GITHUB_REPO: ${{ github.event.repository.name }}
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusLauncher-Windows
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.zip
+            release/*.sha256
+          generate_release_notes: true

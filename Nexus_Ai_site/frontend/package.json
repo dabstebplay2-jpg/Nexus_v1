@@ -1,0 +1,44 @@
+{
+  "name": "nexus-ide-client",
+  "private": true,
+  "version": "0.1.49",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run changelog:validate && vite build",
+    "changelog:validate": "node scripts/validate-changelog.mjs",
+    "changelog:notify": "node scripts/notify-changelog.mjs",
+    "changelog:notify:on-deploy": "node scripts/changelog-notify-on-deploy.mjs",
+    "discord:setup-webhook": "node scripts/discord-setup-webhook.mjs",
+    "discord:sync-vercel": "node scripts/discord-sync-vercel-env.mjs",
+    "discord:sync-github": "node scripts/github-sync-discord-secret.mjs",
+    "discord:bootstrap": "node scripts/discord-sync-vercel-env.mjs && node scripts/github-sync-discord-secret.mjs",
+    "discord:sync-invite": "node scripts/discord-sync-invite-env.mjs",
+    "deploy:vercel": "vercel deploy --prod --yes",
+    "deploy:prod": "npm run build && npm run deploy:vercel && npm run changelog:notify",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^0.359.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.16.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^6.0.3",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.1",
+    "vite": "^8.1.4"
+  },
+  "overrides": {
+    "dompurify": "^3.4.12"
+  }
+}

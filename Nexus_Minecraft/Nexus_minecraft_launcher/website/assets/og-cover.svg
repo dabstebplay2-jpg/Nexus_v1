@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#07130d"/>
+<rect x="70" y="70" width="1060" height="490" rx="42" fill="#0d1b13" stroke="#2cc760" stroke-width="3"/>
+<text x="120" y="210" font-family="Segoe UI, Arial" font-size="78" font-weight="900" fill="#f5fff7">Nexus Launcher</text>
+<text x="120" y="295" font-family="Segoe UI, Arial" font-size="42" font-weight="700" fill="#91ffad">Minecraft launcher for Windows</text>
+<text x="120" y="370" font-family="Segoe UI, Arial" font-size="30" fill="#b9c9bd">Mods • Shaders • Builds • Installer • Updates</text>
+<rect x="120" y="430" width="340" height="76" rx="20" fill="#35d66b"/>
+<text x="165" y="480" font-family="Segoe UI, Arial" font-size="28" font-weight="900" fill="#06100a">Download</text>
+<rect x="780" y="150" width="260" height="260" rx="34" fill="#132f1c" stroke="#35d66b" stroke-width="5"/>
+<path d="M835 350V210h38l74 82V210h38v140h-38l-74-82v82h-38z" fill="#91ffad"/>
+</svg>

@@ -1,0 +1,2 @@
+{"messages":[{"role":"system","content":"Ты полезный помощник по Python."},{"role":"user","content":"Как вывести строку в Python?"},{"role":"assistant","content":"Используйте функцию `print`, например: `print(\"Привет\")`."}]}
+{"messages":[{"role":"system","content":"Ты полезный помощник по Python."},{"role":"user","content":"Как безопасно открыть текстовый файл?"},{"role":"assistant","content":"Используйте контекстный менеджер: `with open(path, encoding=\"utf-8\") as file:` — он автоматически закроет файл."}]}
