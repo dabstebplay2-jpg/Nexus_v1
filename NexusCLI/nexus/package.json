@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "bun apps/cli/index.ts",
     "test": "bun test ./test",
+    "check": "bun run script/check.ts",
     "typecheck": "tsc --noEmit",
     "build": "bun run script/build.ts",
     "bench": "bun run bench/run.ts",

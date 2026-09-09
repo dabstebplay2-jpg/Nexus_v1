@@ -27,17 +27,18 @@ export const call = (name: string, args: unknown, id = crypto.randomUUID()): Mod
   { type: "tool", call: { id, name, arguments: args } },
   { type: "finish" },
 ]
-export async function fixture(
+export const brokenAdd = "export const add = (a: number, b: number) => a - b\n"
+export const plainScenario = 'import { add } from "./add"; if (add(2, 3) !== 5) process.exit(1)\n'
+
+/** Fixture with an explicit workspace file set, for regression scenarios that need custom harnesses. */
+export async function fixtureWith(
+  tree: Record<string, string>,
   script: ConstructorParameters<typeof ScriptedProvider>[0],
   rules: Parameters<typeof createNexus>[0]["rules"] = { RUN_TESTS: "allow" },
 ) {
   const root = await mkdtemp(path.join(tmpdir(), "nexus-test-"))
   const workspace = path.join(root, "project")
-  await Bun.write(path.join(workspace, "add.ts"), "export const add = (a: number, b: number) => a - b\n")
-  await Bun.write(
-    path.join(workspace, "scenario.ts"),
-    'import { add } from "./add"; if (add(2, 3) !== 5) process.exit(1)\n',
-  )
+  for (const [file, content] of Object.entries(tree)) await Bun.write(path.join(workspace, file), content)
   const provider = new ScriptedProvider(script)
   const api = await createNexus({ dataDir: path.join(root, "data"), provider, rules })
   return {
@@ -53,4 +54,10 @@ export async function fixture(
       await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 })
     },
   }
+}
+export function fixture(
+  script: ConstructorParameters<typeof ScriptedProvider>[0],
+  rules: Parameters<typeof createNexus>[0]["rules"] = { RUN_TESTS: "allow" },
+) {
+  return fixtureWith({ "add.ts": brokenAdd, "scenario.ts": plainScenario }, script, rules)
 }
