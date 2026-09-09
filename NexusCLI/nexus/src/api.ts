@@ -1,4 +1,17 @@
-import type { AgentSession, Budgets, Check, Contract, Event, Input, ModelConfig } from "./domain/types"
+import type {
+  Action,
+  AgentSession,
+  Budgets,
+  Check,
+  Contract,
+  Epoch,
+  Event,
+  Evidence,
+  Input,
+  ModelConfig,
+  Turn,
+  VerificationRun,
+} from "./domain/types"
 export type { AgentSession, Check, Contract, Event, ModelConfig } from "./domain/types"
 
 /** UI boundary: clients submit commands and render events; they never mutate the runner. */
@@ -20,13 +33,13 @@ export interface NexusAPI {
   }
   inspect(id: string): {
     session: AgentSession
-    actions: unknown[]
-    evidence: unknown[]
+    actions: Action[]
+    evidence: Evidence[]
     events: Event[]
     inputs: Input[]
-    turns: unknown[]
-    epochs: unknown[]
-    verification: unknown[]
+    turns: Turn[]
+    epochs: Epoch[]
+    verification: VerificationRun[]
   }
   assertGoal(id: string, note: string): Promise<void>
   resolveAction(id: string, actionId: string, outcome: "VERIFIED" | "FAILED", note: string): void

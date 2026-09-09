@@ -1,0 +1,97 @@
+import path from "node:path"
+import { files, hashFile } from "../tools/workspace"
+import { runProcess } from "../tools/process"
+
+/**
+ * WorkspaceDelta answers one question: did anything that a check *depends on* change while
+ * that check was running? A check that only writes new caches, reports or logs is still
+ * trustworthy. A check that rewrites tracked source has invalidated its own inputs.
+ *
+ * There is deliberately no ignore-list. "Source" is decided by evidence:
+ *   1. Git, when present, is the authority: ignored files are not source.
+ *   2. Paths a trusted check was previously observed to create are not source.
+ *   3. Anything a check creates from nothing is not source; only mutating or deleting
+ *      pre-existing content can invalidate a result.
+ */
+export type Inventory = { paths: Map<string, string>; git: boolean }
+export type Delta = {
+  created: string[]
+  modified: string[]
+  deleted: string[]
+  /** Changes that make the check's exit code unattributable. Non-empty means the verdict is UNKNOWN. */
+  sourceChanges: string[]
+  /** Newly observed generated paths and directory prefixes, to be remembered on the contract. */
+  learned: string[]
+  git: boolean
+}
+
+const normalise = (file: string) => file.split(path.sep).join("/")
+
+/** Tracked plus untracked-but-not-ignored paths. Git-ignored output never enters the source set. */
+async function gitSourcePaths(workspace: string) {
+  const result = await runProcess(
+    ["git", "--no-optional-locks", "ls-files", "-c", "-o", "--exclude-standard", "-z"],
+    workspace,
+    AbortSignal.timeout(15000),
+  ).catch(() => undefined)
+  if (!result || result.exitCode !== 0) return undefined
+  return result.stdout.split("\0").filter(Boolean).map(normalise)
+}
+
+export function isGenerated(file: string, generated: readonly string[]) {
+  const target = normalise(file)
+  return generated.some((entry) => (entry.endsWith("/") ? target.startsWith(entry) : target === entry))
+}
+
+/** Snapshot the paths a check depends on, with content hashes. */
+export async function inventory(workspace: string, generated: readonly string[] = []): Promise<Inventory> {
+  const tracked = await gitSourcePaths(workspace)
+  const candidates = (tracked ?? (await files(workspace)).map(normalise)).filter(
+    (file) => !isGenerated(file, generated),
+  )
+  const entries = await Promise.all(
+    candidates.map(async (file) => {
+      const hash = await hashFile(path.join(workspace, file)).catch(() => undefined)
+      return hash === undefined ? undefined : ([file, hash] as const)
+    }),
+  )
+  return {
+    paths: new Map(entries.filter((entry): entry is [string, string] => entry !== undefined)),
+    git: tracked !== undefined,
+  }
+}
+
+/** A stable identity for the source a decision was based on; generated output cannot stale it. */
+export function inventoryFingerprint(snapshot: Inventory) {
+  const hash = new Bun.CryptoHasher("sha256")
+  for (const file of [...snapshot.paths.keys()].sort()) hash.update(file).update(snapshot.paths.get(file)!)
+  return hash.digest("hex")
+}
+
+/** The shallowest directory that did not exist before the check, else the file itself. */
+function attribute(file: string, before: Inventory) {
+  const parts = file.split("/")
+  for (const index of parts.keys()) {
+    if (index === parts.length - 1) break
+    const prefix = `${parts.slice(0, index + 1).join("/")}/`
+    if (![...before.paths.keys()].some((existing) => existing.startsWith(prefix))) return prefix
+  }
+  return file
+}
+
+export function compare(before: Inventory, after: Inventory, generated: readonly string[] = []): Delta {
+  const created = [...after.paths.keys()].filter((file) => !before.paths.has(file))
+  const modified = [...after.paths.keys()].filter(
+    (file) => before.paths.has(file) && before.paths.get(file) !== after.paths.get(file),
+  )
+  const deleted = [...before.paths.keys()].filter((file) => !after.paths.has(file))
+  return {
+    created,
+    modified,
+    deleted,
+    // Only pre-existing content that moved can invalidate the check that ran over it.
+    sourceChanges: [...modified, ...deleted].filter((file) => !isGenerated(file, generated)).sort(),
+    learned: [...new Set(created.map((file) => attribute(file, before)))].sort(),
+    git: before.git && after.git,
+  }
+}

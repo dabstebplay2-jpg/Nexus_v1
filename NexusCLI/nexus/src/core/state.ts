@@ -14,11 +14,12 @@ const allowed: Record<Status, Status[]> = {
   WAITING_PERMISSION: ["ACTING", "VERIFYING", "RECOVERING"],
   COMPLETED: ["RECOVERING"],
   FAILED: ["RECOVERING"],
+  UNKNOWN: ["RECOVERING"],
   ABORTED: ["RECOVERING"],
 }
 export function transition(store: Store, session: AgentSession, next: Status, emit: EventSink, reason = "") {
   if (next === session.status) return
-  if (!["FAILED", "ABORTED"].includes(next) && !allowed[session.status].includes(next))
+  if (!["FAILED", "ABORTED", "UNKNOWN"].includes(next) && !allowed[session.status].includes(next))
     throw new NexusError("STATE", `Invalid transition ${session.status} → ${next}`)
   if (next === "COMPLETED" && session.decision?.outcome !== "COMPLETE")
     throw new NexusError("COMPLETION", "CompletionPolicy did not authorize completion")

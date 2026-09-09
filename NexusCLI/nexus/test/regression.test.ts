@@ -4,6 +4,7 @@ import type { AgentSession, Project } from "../src/domain/types"
 import { createContract } from "../src/completion/policy"
 import { modelSchema } from "../src/config/config"
 import { safeJson } from "../src/shared/redact"
+import { runProcess } from "../src/tools/process"
 import { hashFile } from "../src/tools/workspace"
 import { answer, brokenAdd, call, fixtureWith, goalCheck, model, plainScenario } from "./helpers"
 
@@ -87,6 +88,39 @@ describe("D1/D2 verification survives generated artifacts", () => {
       const rerun = await f.api.run(session.id)
       expect(outcome(rerun)).toBe("COMPLETE")
       expect(rerun.status).toBe("COMPLETED")
+    } finally {
+      await f.cleanup()
+    }
+  })
+})
+
+describe("WorkspaceDelta uses Git as the source oracle when it is available", () => {
+  test("git-ignored output is never treated as a source change", async () => {
+    const f = await fixtureWith(
+      { "add.ts": brokenAdd, "scenario.ts": artifactScenario, ".gitignore": ".pytest_cache/\n.turbo/\n" },
+      async (_, turn) => (turn === 1 ? await fixAdd(f.workspace) : answer("Corrected the operator.")),
+    )
+    try {
+      for (const argv of [
+        ["git", "init", "-q"],
+        ["git", "add", "-A"],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "baseline"],
+      ])
+        await runProcess(argv, f.workspace, AbortSignal.timeout(20000))
+      const session = await f.api.create({
+        workspace: f.workspace,
+        goal: "Fix addition",
+        model,
+        goalCheck,
+        budgets: { maxTurns: 6 },
+      })
+      const result = await f.api.run(session.id)
+      expect(result.status).toBe("COMPLETED")
+      const proof = f.api
+        .inspect(session.id)
+        .evidence.findLast((item) => item.source === "verification" && item.verdict === "pass")
+      expect(proof?.metadata.attribution).toBe("git")
+      expect(proof?.metadata.sourceChanges).toEqual([])
     } finally {
       await f.cleanup()
     }

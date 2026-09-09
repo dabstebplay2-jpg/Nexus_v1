@@ -39,3 +39,7 @@ export type PermissionRequest = {
 }
 export type PermissionReply = (request: PermissionRequest, signal: AbortSignal) => Promise<boolean>
 export type EventSink = (event: Event) => void
+/** Provider-independent token accounting. Implementations may wrap a real tokenizer. */
+export interface TokenCounter {
+  count(text: string): number
+}

@@ -8,7 +8,7 @@ import { completionPolicy } from "../completion/policy"
 import { loopGuard } from "../loop-guard/policy"
 import { promote } from "../session/inbox"
 import { recover } from "../recovery/policy"
-import { fingerprint } from "../tools/workspace"
+import { inventory, inventoryFingerprint } from "../verification/delta"
 import { abort, errorText, NexusError, createDeadline } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
 import { publish, transition } from "./state"
@@ -43,6 +43,9 @@ export class AgentLoop {
     ])
     const move = (status: AgentSession["status"], reason = "") =>
       transition(this.deps.store, session, status, this.deps.emit, reason)
+    // Decisions are anchored to project source only, so generated output cannot stale evidence.
+    const sourceFingerprint = async () =>
+      inventoryFingerprint(await inventory(session.workspace, session.contract.generatedPaths ?? []))
     try {
       move("RECOVERING")
       const unknown = await recover(session, this.deps.store)
@@ -105,13 +108,15 @@ export class AgentLoop {
         move("ACTING")
         const snapshot = this.deps.registry.capture()
         const specs = session.contract.mode === "answer" ? [] : snapshot.specs
-        const messages = await this.deps.context.build(session, Buffer.byteLength(safeJson(specs)))
+        const specTokens = this.deps.context.countText(safeJson(specs))
+        const messages = await this.deps.context.build(session, specTokens)
         const turn: Turn = {
           id: crypto.randomUUID(),
           sessionId: id,
           number: ++session.turns,
           status: "STARTED",
           contextChars: safeJson(messages).length,
+          contextTokens: this.deps.context.tokens(messages) + specTokens,
           model: session.model.model,
         }
         this.deps.store.transaction(() => {
@@ -122,6 +127,8 @@ export class AgentLoop {
           turn: turn.number,
           model: turn.model,
           contextChars: turn.contextChars,
+          contextTokens: turn.contextTokens,
+          contextWindow: session.model.capabilities.contextLength,
           epoch: session.epoch,
         })
         const calls: ToolCall[] = []
@@ -214,14 +221,14 @@ export class AgentLoop {
             actual: parts.join(""),
             verdict: "pass",
             metadata: { informational: true },
-            fingerprint: await fingerprint(session.workspace),
+            fingerprint: await sourceFingerprint(),
             contractRevision: session.contract.revision,
           })
         const beforeVerification = completionPolicy(
           session,
           this.deps.store.list("actions", id),
           this.deps.store.list("evidence", id),
-          await fingerprint(session.workspace),
+          await sourceFingerprint(),
         )
         if (session.contract.mode === "coding" && beforeVerification.outcome === "NEEDS_VERIFICATION")
           await this.deps.verification.run(session, deadline, () => move("WAITING_PERMISSION", "verification"))
@@ -230,7 +237,7 @@ export class AgentLoop {
           session,
           this.deps.store.list("actions", id),
           this.deps.store.list("evidence", id),
-          await fingerprint(session.workspace),
+          await sourceFingerprint(),
         )
         publish(this.deps.store, session, this.deps.emit, "completion", session.decision)
         // Recheck durable admission after verification, which may have taken minutes.
@@ -244,6 +251,10 @@ export class AgentLoop {
             continue
           }
           move("COMPLETED", session.decision.reason)
+          break
+        }
+        if (session.decision?.outcome === "UNKNOWN") {
+          move("UNKNOWN", session.decision.reason)
           break
         }
         if (["NEEDS_USER_INPUT", "BLOCKED"].includes(session.decision?.outcome ?? "")) {

@@ -1,5 +1,6 @@
 import type { AgentSession, Message } from "../domain/types"
-import type { Store } from "../domain/ports"
+import type { Store, TokenCounter } from "../domain/ports"
+import { HeuristicTokenCounter, countMessages } from "./tokens"
 import { bound, safeJson } from "../shared/redact"
 import { guard } from "../tools/workspace"
 import { NexusError } from "../shared/errors"
@@ -19,11 +20,19 @@ export class ContextManager {
   constructor(
     private readonly store: Store,
     private readonly sources: ContextSource[] = [],
+    private readonly counter: TokenCounter = new HeuristicTokenCounter(),
   ) {
     if (new Set(sources.map((source) => source.key)).size !== sources.length)
       throw new NexusError("CONTEXT", "Duplicate context source")
   }
-  async build(session: AgentSession, toolChars: number) {
+  /** Token cost of a rendered conversation, including the per-message envelope. */
+  tokens(messages: Message[]) {
+    return countMessages(this.counter, messages)
+  }
+  countText(text: string) {
+    return this.counter.count(text)
+  }
+  async build(session: AgentSession, toolTokens: number) {
     const sources = await Promise.all([
       Promise.resolve(`EnvironmentContext: ${safeJson({ workspace: session.workspace, platform: process.platform })}`),
       Promise.resolve(`ProjectContext: ${safeJson(session.project)}`),
@@ -90,11 +99,12 @@ export class ContextManager {
       },
       ...session.conversation.slice(session.epochStart),
     ]
-    if (Buffer.byteLength(safeJson(render())) + toolChars > available) this.compact(session, baseline)
-    if (Buffer.byteLength(safeJson(render())) + toolChars > available)
+    const used = () => this.tokens(render()) + toolTokens
+    if (used() > available) this.compact(session, baseline)
+    if (used() > available)
       throw new NexusError(
         "CONTEXT_OVERFLOW",
-        "Required instructions and tool schemas exceed the context budget; increase context_length or shorten the task",
+        `Required instructions and tool schemas need ~${used()} tokens but only ${available} are available; increase context_length or shorten the task`,
       )
     const epoch = this.store.list("context_epochs", session.id).findLast((item) => item.number === session.epoch)
     if (!epoch || !epoch.snapshot)

@@ -1,4 +1,5 @@
 import type { Action, AgentSession, Check, Contract, Decision, Evidence, Project } from "../domain/types"
+import { classifyIntent } from "./intent"
 
 export function createContract(goal: string, project: Project, mode: Contract["mode"], goalCheck?: Check): Contract {
   if (mode === "answer")
@@ -17,11 +18,12 @@ export function createContract(goal: string, project: Project, mode: Contract["m
       ],
     }
   const checks = [...project.checks, ...(goalCheck ? [goalCheck] : [])]
-  const testsOnly =
-    /^(?:fix (?:the )?(?:failing|broken) tests|найди причину падения тестов,? исправь е[её] и проверь результат)[.!]?$/i.test(
-      goal.trim(),
-    )
-  const test = !goalCheck && testsOnly ? project.checks.find((check) => check.kind === "TEST_RESULT") : undefined
+  // A repair request is proved by reproducing the failure and then removing it. A user-supplied
+  // goal check is already a stronger proof, so it replaces the reproduction contract.
+  const test =
+    !goalCheck && classifyIntent(goal) === "repair"
+      ? project.checks.find((check) => check.kind === "TEST_RESULT")
+      : undefined
   return {
     revision: 1,
     goal,
@@ -83,6 +85,31 @@ export function completionPolicy(
     }
   if (session.errors.length)
     return { outcome: "INCOMPLETE", reason: "Unresolved runtime errors", missing: session.errors }
+  // Repetition cannot turn an unattributable check into a proof. Once a check has come back
+  // unknown twice, say so and stop instead of verifying forever.
+  const unknownFor = (checkId: string) =>
+    evidence.filter(
+      (item) =>
+        item.contractRevision === session.contract.revision &&
+        item.source === "verification" &&
+        item.metadata.checkId === checkId &&
+        item.verdict === "unknown",
+    )
+  const unprovable = session.contract.criteria.filter(
+    (criterion) =>
+      criterion.required && criterion.checkId && !criterion.baseline && unknownFor(criterion.checkId).length >= 2,
+  )
+  if (unprovable.length)
+    return {
+      outcome: "UNKNOWN",
+      reason: unprovable
+        .map((criterion) => {
+          const detail = unknownFor(criterion.checkId!).at(-1)?.metadata.unknownReason
+          return `${criterion.description}: ${typeof detail === "string" ? detail : "the check result could not be attributed to the agent's work"}`
+        })
+        .join("; "),
+      missing: unprovable.map((criterion) => criterion.id),
+    }
   const missing = session.contract.criteria.filter((criterion) => {
     if (!criterion.required) return false
     const candidates = evidence.filter(
