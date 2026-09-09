@@ -59,6 +59,35 @@ export class RunManager {
     if (!run) throw new NexusError("INPUT", `Unknown run: ${id}`)
     return run
   }
+  /**
+   * Adopt a session that exists in the ledger but not in this process, so a task from an
+   * earlier server run can still be inspected and resumed. Its event history is replayed from
+   * the ledger rather than reconstructed.
+   */
+  async adopt(id: string) {
+    if (this.runs.has(id)) return
+    const session = this.api.sessions().find((item) => item.id === id)
+    if (!session) throw new NexusError("INPUT", `Unknown run: ${id}`)
+    const project = (await this.registry.list()).find((item) => item.path === session.workspace)
+    this.runs.set(id, {
+      id,
+      projectId: project?.id ?? "",
+      goal: session.goal,
+      workspace: session.workspace,
+      mode: project?.settings.mode ?? "balanced",
+      model: session.model.model,
+      startedAt: session.createdAt,
+      finishedAt: session.updatedAt,
+      running: false,
+      allowChecks: project?.settings.allowChecks ?? false,
+      emitted: 0,
+      events: [],
+      seen: new Set<string>(),
+      listeners: new Set<(event: StreamEvent) => void>(),
+      cancellation: new AbortController(),
+    })
+    this.api.inspect(id).events.forEach(this.ingest)
+  }
   private session(id: string): AgentSession {
     const found = this.api.sessions().find((session) => session.id === id)
     if (!found) throw new NexusError("INPUT", `Unknown session: ${id}`)
@@ -235,6 +264,23 @@ export class RunManager {
     if (run.pending?.prompt.requestId !== requestId)
       throw new NexusError("INPUT", "That permission request is no longer pending")
     run.pending.settle(approved)
+  }
+  /**
+   * Resume the same session after the user supplied what was missing. Only the completion
+   * policy can promote it; this just runs the loop again over the corrected ledger.
+   */
+  resume(id: string) {
+    const run = this.require(id)
+    if (run.running) throw new NexusError("CONFLICT", `Run already in progress: ${id}`)
+    const busy = [...this.runs.values()].find((other) => other.projectId === run.projectId && other.running)
+    if (busy) throw new NexusError("CONFLICT", `This project already has a run in progress: ${busy.id}`)
+    run.running = true
+    run.finishedAt = undefined
+    run.error = undefined
+    run.cancellation = new AbortController()
+    this.announce(run, "run_resumed", { runId: run.id })
+    void this.execute(run)
+    return this.summary(id)
   }
   cancel(id: string) {
     const run = this.require(id)

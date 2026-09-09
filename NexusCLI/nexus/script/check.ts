@@ -17,6 +17,7 @@ const steps = [
   { name: "bench", argv: ["run", "bench"], why: "Scripted reliability smoke: no false completion" },
   { name: "build", argv: ["run", "build"], why: "Standalone executable must build (smoke depends on it)" },
   { name: "smoke", argv: ["run", "smoke"], why: "Standalone CLI end-to-end over real HTTP/SSE" },
+  { name: "product", argv: ["run", "smoke:product"], why: "API server end-to-end: HTTP, SSE, proved run report" },
 ] as const
 
 const args = process.argv.slice(2)

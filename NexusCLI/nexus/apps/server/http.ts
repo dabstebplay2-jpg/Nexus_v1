@@ -170,9 +170,7 @@ export function createRouter(deps: ServerDeps) {
         }
         const send = (event: { cursor: number; type: string }) => {
           if (state.closed) return
-          controller.enqueue(
-            encoder.encode(`id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`),
-          )
+          controller.enqueue(encoder.encode(`id: ${event.cursor}\ndata: ${JSON.stringify(event)}\n\n`))
           if (event.type === "run_finished") close()
         }
         const subscription = deps.runs.subscribe(id, cursor, send)
@@ -278,15 +276,25 @@ export function createRouter(deps: ServerDeps) {
       if (method === "GET") return json(deps.runs.list(), headers)
       if (method === "POST") return json(await deps.runs.start(await body(request, createRun)), headers, 201)
     }
-    if (parts.length === 3 && parts[1] === "runs" && method === "GET")
+    if (parts.length === 3 && parts[1] === "runs" && method === "GET") {
+      await deps.runs.adopt(parts[2]!)
       return json(deps.runs.summary(parts[2]!), headers)
+    }
     if (parts.length === 4 && parts[1] === "runs") {
       const id = parts[2]!
       const action = parts[3]!
-      if (method === "GET" && action === "events")
+      if (method === "GET" && action === "events") {
+        await deps.runs.adopt(id)
         return stream(id, Number(url.searchParams.get("cursor") ?? 0) || 0, headers)
-      if (method === "GET" && action === "report") return json(deps.runs.report(id), headers)
-      if (method === "GET" && action === "diff") return json(deps.runs.diff(id), headers)
+      }
+      if (method === "GET" && action === "report") {
+        await deps.runs.adopt(id)
+        return json(deps.runs.report(id), headers)
+      }
+      if (method === "GET" && action === "diff") {
+        await deps.runs.adopt(id)
+        return json(deps.runs.diff(id), headers)
+      }
       if (method === "POST" && action === "prompt") {
         const input = await body(request, promptBody)
         return json(deps.runs.prompt(id, input.text, input.delivery ?? "STEER"), headers)
@@ -295,6 +303,10 @@ export function createRouter(deps: ServerDeps) {
         const input = await body(request, permissionBody)
         deps.runs.answerPermission(id, input.requestId, input.approved)
         return json(deps.runs.summary(id), headers)
+      }
+      if (method === "POST" && action === "resume") {
+        await deps.runs.adopt(id)
+        return json(deps.runs.resume(id), headers)
       }
       if (method === "POST" && action === "cancel") {
         deps.runs.cancel(id)

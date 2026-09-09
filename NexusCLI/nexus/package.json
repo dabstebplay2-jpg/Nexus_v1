@@ -20,6 +20,7 @@
     "bench": "bun run bench/run.ts",
     "check:boundaries": "bun run script/boundaries.ts",
     "smoke": "bun run script/smoke.ts",
+    "smoke:product": "bun run script/product-smoke.ts",
     "format:check": "prettier --check src apps test script bench/run.ts bench/oracle.ts docs README.md"
   },
   "dependencies": {

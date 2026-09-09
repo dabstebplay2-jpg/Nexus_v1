@@ -2,7 +2,7 @@
 
 Локальный coding agent, у которого **«готово» — решение Core на основании evidence, а не фраза модели**.
 
-Версия 0.1 — работающий фундамент: CLI, SQLite, OpenAI-compatible Chat Completions, tools, durable inbox, проверки, recovery, контекст и детерминированные сценарии. Исходный OpenCode в родительской папке используется только как reference и не является зависимостью Nexus.
+Версия 0.1 — работающий фундамент: CLI, SQLite, OpenAI-compatible Chat Completions, tools, durable inbox, проверки, recovery, контекст и детерминированные сценарии. Версия 0.2 добавляет продуктовый слой поверх того же ядра: API-сервер и веб-интерфейс, которые показывают план, изменения, проверки и доказательства. Исходный OpenCode в родительской папке используется только как reference и не является зависимостью Nexus.
 
 ## Быстрый старт на Windows
 
@@ -44,6 +44,28 @@ $env:NEXUS_API_KEY = 'ваш-ключ'
 ```
 
 Добавьте папку `dist` в PATH — после этого в любом проекте доступна команда `nexus`. Файл содержит runtime; компиляторы, package managers и тестовые зависимости целевого проекта устанавливаются отдельно. Для Linux/macOS: установите [Bun](https://bun.sh/docs/installation), выполните `bun install`, `bun run build`; результат — `dist/nexus`.
+
+## Веб-интерфейс (v0.2)
+
+Продуктовый слой не содержит второго агента: API-сервер — такой же клиент `NexusAPI`, как и CLI, поэтому решение о завершении принимает то же ядро.
+
+```powershell
+.\node_modules\.bin\bun.cmd run web:install
+.\node_modules\.bin\bun.cmd run web:build
+.\node_modules\.bin\bun.cmd run server
+```
+
+Сервер поднимается на `http://127.0.0.1:4319` (только loopback) и отдаёт собранный интерфейс. Для разработки интерфейса: `bun run server` в одном терминале и `bun run web:dev` в другом — Vite проксирует `/api` на сервер.
+
+Экран состоит из трёх панелей:
+
+- **Projects** — каталоги проектов, определённый тип проекта, найденные проверки, история задач из журнала ядра;
+- **Chat** — задача, поток событий агента, запросы разрешений, итоговый результат;
+- **Execution** — `PLAN`, `CHANGES`, `VERIFICATION`, `EVIDENCE`, `RESULT` из того же отчёта, что печатает CLI.
+
+Состояние `UNKNOWN` не тупик: интерфейс показывает кнопки `Trust checks`, `I checked it myself` и `Resume` ровно тогда, когда они применимы.
+
+Провайдеры (OpenAI, Anthropic, Ollama, LM Studio, llama.cpp, vLLM) — это пресеты одного и того же openai-compatible протокола; кнопка `Probe` запрашивает у выбранного endpoint реальный список моделей. Ключи не передаются в интерфейс — API сообщает только факт их наличия. Режимы `Fast / Balanced / Deep Reasoning` меняют реальные бюджеты прогона, а не подпись.
 
 ## Что считается завершением
 
@@ -99,7 +121,10 @@ Shell и project scripts работают с правами пользовате
 .\node_modules\.bin\bun.cmd run check:boundaries
 .\node_modules\.bin\bun.cmd run bench
 .\node_modules\.bin\bun.cmd run build
+.\node_modules\.bin\bun.cmd run check
 ```
+
+`bun run check` выполняет все семь проверок по порядку и печатает одну итоговую таблицу.
 
 На системе с Bun в PATH используйте `bun typecheck`, `bun test`, `bun run bench`, `bun run build`. Основные тесты используют scripted provider, настоящую SQLite, файловую систему, HTTP/SSE-серверы и subprocess. Платные API для тестов не нужны. NexusBench содержит два успешных исправления и отрицательный сценарий ложного завершения; независимый oracle запускается вне workspace агента. Это проверка надёжности механизма, не оценка интеллекта настоящей модели.
 
@@ -107,6 +132,9 @@ Shell и project scripts работают с правами пользовате
 
 ```text
 apps/cli/                  terminal adapter
+apps/server/               API-сервер и agent bridge (v0.2)
+apps/shared/               wire-контракт, run report, пресеты моделей, реестр проектов
+apps/web/                  React + TypeScript + Vite интерфейс (v0.2)
 src/api.ts                 public UI boundary
 src/composition.ts         единственный composition root
 src/domain/                сущности и порты
@@ -128,4 +156,4 @@ src/config/, src/shared/   конфигурация, ошибки, redaction
 test/, bench/, docs/
 ```
 
-Подробности: [архитектура](docs/ARCHITECTURE.md), [цикл](docs/AGENT_LOOP.md), [верификация](docs/VERIFICATION.md), [recovery](docs/RECOVERY.md), [tools](docs/TOOLS.md), [публичный API](docs/API.md), [roadmap и ограничения](docs/ROADMAP.md).
+Подробности: [продуктовый слой](docs/PRODUCT_LAYER.md), [архитектура](docs/ARCHITECTURE.md), [цикл](docs/AGENT_LOOP.md), [верификация](docs/VERIFICATION.md), [recovery](docs/RECOVERY.md), [tools](docs/TOOLS.md), [публичный API](docs/API.md), [roadmap и ограничения](docs/ROADMAP.md).

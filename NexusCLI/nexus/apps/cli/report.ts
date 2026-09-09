@@ -1,6 +1,7 @@
 import type { NexusAPI } from "../../src/api"
 import type { AgentSession } from "../../src/domain/types"
-import { buildRunReport, type RunReport } from "../shared/run-report"
+import type { RunReport } from "../shared/protocol"
+import { buildRunReport } from "../shared/run-report"
 
 /**
  * The terminal rendering of the run report. Nexus's whole claim is that it can prove what it

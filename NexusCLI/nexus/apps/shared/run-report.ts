@@ -1,68 +1,15 @@
 import type { NexusAPI } from "../../src/api"
-import type { AgentSession, Decision, EvidenceKind, Status, Verdict } from "../../src/domain/types"
+import type { AgentSession } from "../../src/domain/types"
+import type { ReportAffordance, RunReport } from "./protocol"
 
 /**
- * The structured run report.
+ * Derivation of the run report from the session ledger.
  *
  * Nexus's whole claim is that it can prove what it did, so every client must show the same
  * proof: what it planned, what it changed, what it ran, what that produced, and what may be
- * concluded from it. This module owns the *derivation* of those facts from the session ledger.
- * Wording, colour and layout stay in each client, so the terminal and the web interface can
- * present the same facts without either one inventing a verdict of its own.
+ * concluded from it. Wording, colour and layout stay in each client, so the terminal and the
+ * web interface present identical facts without either one inventing a verdict of its own.
  */
-export type ReportPlanStep = {
-  id: string
-  description: string
-  state: "PENDING" | "ACTIVE" | "DONE" | "BLOCKED"
-  note: string
-}
-export type ReportFileChange = { path?: string; added: number; removed: number; patch: string }
-export type ReportProcess = { actionId: string; tool: string; status: string; attribution: string }
-export type ReportCheck = {
-  checkId: string
-  verdict: Verdict
-  argv: string
-  exitCode?: number
-  unknownReason?: string
-  /** Files this check mutated while running, which is why its exit code cannot be attributed. */
-  sourceChanges: string[]
-  evidenceId: string
-}
-export type ReportCriterion = {
-  id: string
-  description: string
-  kind: EvidenceKind
-  expectedVerdict: Verdict
-  baseline: boolean
-  met: boolean
-  verdict?: Verdict
-  evidenceId?: string
-  /** The completion policy listed this criterion as the reason the run is not complete. */
-  unsatisfied: boolean
-}
-/** What a human can do next. Derived once so no client has to guess the way out of UNKNOWN. */
-export type ReportAffordance = "inspect" | "trust-checks" | "assert-goal" | "resolve-action" | "resume"
-export type RunReport = {
-  sessionId: string
-  goal: string
-  status: Status
-  project: string
-  model: string
-  branch: string
-  turns: number
-  toolCount: number
-  createdAt: number
-  updatedAt: number
-  decision?: Decision
-  plan: ReportPlanStep[]
-  changes: { files: ReportFileChange[]; processes: ReportProcess[] }
-  verification: ReportCheck[]
-  evidence: ReportCriterion[]
-  affordances: ReportAffordance[]
-  /** The model's closing message. Only trustworthy once the completion policy authorized COMPLETED. */
-  proposal?: { verified: boolean; text: string }
-}
-
 const number = (value: unknown) => (typeof value === "number" ? value : undefined)
 const strings = (value: unknown) => (Array.isArray(value) ? value.map(String) : [])
 

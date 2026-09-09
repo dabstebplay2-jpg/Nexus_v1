@@ -237,9 +237,9 @@ NexusCLI/nexus/
 | **E0** | Анализ + этот документ | — | `docs: Nexus v0.2 product layer plan` |
 | **E1** | `apps/shared/run-report.ts`; `apps/cli/report.ts` → рендерер | golden-diff CLI-отчёта пуст; `bun run check` 6/6 | `refactor: extract structured RunReport` |
 | **E2** | `apps/shared/{protocol,models,projects}.ts` | typecheck, boundaries | `feat: product-layer contracts` |
-| **E3** | `apps/server/{runs,http,index}.ts` | `test/product.test.ts` e2e | `feat: Nexus API server` |
-| **E4** | `apps/web` (Vite/React/TS, 3 панели) | build веба, ручной прогон | `feat: Nexus web interface` |
-| **E5** | Финальный прогон гейта + документация | `bun run check` 6/6 + новые тесты | `chore: v0.2 release checks` |
+| **E3** | `apps/server/{runs,http,index}.ts` | `test/product.test.ts` e2e + `script/product-smoke.ts` | `feat: Nexus API server` |
+| **E4** | `apps/web` (Vite/React/TS, 3 панели) | build веба, прогон в браузере | `feat: Nexus web interface` |
+| **E5** | Финальный прогон гейта + документация | `bun run check` 7/7 + новые тесты | `chore: v0.2 release checks` |
 
 Каждый этап: `git status` → тесты → typecheck → build → коммит. По завершении — ветка `nexus-v0.2` и push; при отсутствии прав — `git bundle` + patch-файлы.
 
@@ -263,29 +263,43 @@ NexusCLI/nexus/
 
 ## 6. Definition of Done (Nexus v0.2 MVP)
 
-Каждый пункт считается выполненным только при наблюдаемом результате.
+Каждый пункт считается выполненным только при наблюдаемом результате. Отметки ниже проставлены по факту реализации.
 
 **Функциональные (требования первого релиза):**
 
-- [ ] **D1. Открыть проект.** `POST /api/projects` регистрирует путь; `GET /api/projects/:id` возвращает `kind` и `checks` из реального `detect()`.
-- [ ] **D2. Отправить задачу агенту.** `POST /api/runs` создаёт сессию через `api.create()` и запускает `api.run()`.
-- [ ] **D3. Получить поток событий.** `GET /api/runs/:id/events` отдаёт SSE; тест получает `created`, `state`, `tool`, терминальное событие; реплей по `cursor` работает.
-- [ ] **D4. Показать план.** `RunReport.plan` соответствует `session.plan`.
-- [ ] **D5. Показать изменения.** `RunReport.changes.files` содержит путь, `+добавлено/-удалено` и патч из `api.diff()`.
-- [ ] **D6. Показать проверки.** `RunReport.verification` содержит `checkId`, вердикт, argv, exit code и причину UNKNOWN.
-- [ ] **D7. Показать доказательство результата.** `RunReport.evidence` показывает по каждому обязательному критерию контракта: выполнен или нет и каким evidence ID; `RunReport.result` берёт статус из `session.decision`.
+- [x] **D1. Открыть проект.** `POST /api/projects` регистрирует путь; `GET /api/projects/:id` возвращает `kind` и `checks` из реального `detect()`.
+      *Проверено:* «registering a directory reports the real detected project, not a guess»; «a missing directory is refused instead of registered».
+- [x] **D2. Отправить задачу агенту.** `POST /api/runs` создаёт сессию через `api.create()` и запускает `api.run()`.
+      *Проверено:* «a task streams events and ends with a report that proves the result»; `script/product-smoke.ts`.
+- [x] **D3. Получить поток событий.** SSE отдаёт `created`, `state`, `tool` и терминальное `run_finished`; реплей по `cursor` работает; кадры без поля `event:`, поэтому один обработчик браузера видит все типы.
+      *Проверено:* «replaying from a cursor returns only the events after it»; «frames carry no named event type…».
+- [x] **D4. Показать план.** `RunReport.plan` соответствует `session.plan`.
+- [x] **D5. Показать изменения.** `RunReport.changes.files` содержит путь, `+/-` и патч из `api.diff()`.
+- [x] **D6. Показать проверки.** `RunReport.verification` содержит `checkId`, вердикт, argv, exit code и причину `UNKNOWN`.
+- [x] **D7. Показать доказательство результата.** `RunReport.evidence` для каждого обязательного критерия показывает, доказан он и каким `evidenceId`; `RunReport.result` берёт статус из `session.decision`.
+      *D4–D7 проверены* тем же MVP-тестом, продуктовым smoke и прогоном в браузере.
 
 **Целостность (главный принцип):**
 
-- [ ] **D8.** Прогон с недоказуемой проверкой возвращает через HTTP `status: "UNKNOWN"` — не `COMPLETED` и не `FAILED` — и `RunReport.result.nextSteps` предлагает `trust-checks` / `assert-goal`.
-- [ ] **D9.** Ни один ответ API не содержит вердикта, вычисленного вне `completionPolicy`.
+- [x] **D8.** Прогон с недоказуемой проверкой возвращает через HTTP `status: "UNKNOWN"` и `affordances`, содержащие `trust-checks` и `assert-goal`.
+      *Проверено:* «an unprovable check is reported as UNKNOWN over HTTP, with a way out».
+- [x] **D9.** Ни один ответ API не содержит вердикта, вычисленного вне `completionPolicy`. Ручное подтверждение сохраняется как user evidence и само по себе не переводит сессию в `COMPLETED`; повышение происходит только на следующем прогоне.
+      *Проверено:* «a manual assertion is recorded as user evidence, not as a passing check»; «assert-goal then resume lets the completion policy promote the session».
 
 **Регрессии и качество:**
 
-- [ ] **D10.** `bun run check` — 6/6 PASS.
-- [ ] **D11.** Все 66 существующих тестов проходят; новые тесты продуктового слоя добавлены к ним.
-- [ ] **D12.** Текст CLI-отчёта побайтово совпадает с golden-снимком до рефакторинга.
-- [ ] **D13.** `apps/web` собирается (`vite build`) без ошибок TypeScript.
-- [ ] **D14.** Ни одного изменения в `src/core/`, `src/completion/`, `src/verification/`, `src/domain/`.
+- [x] **D10.** `bun run check` — 7/7 PASS (добавлен шаг `product`: API-сервер end-to-end через реальные HTTP и SSE).
+- [x] **D11.** Все 66 существующих тестов проходят; добавлено 15 тестов продуктового слоя, итого 81.
+- [x] **D12.** Текст CLI-отчёта побайтово совпадает со снимком до рефакторинга для прогонов `COMPLETED`, `UNKNOWN` и `FAILED` (2824 байта, пустой diff против `0411d7a`).
+- [x] **D13.** `apps/web` собирается: `tsc --noEmit` и `vite build` без ошибок.
+- [x] **D14.** Ни одного изменения в `src/core/`, `src/completion/`, `src/verification/`, `src/domain/`.
 
-**Вне границ v0.2 (осознанно не делаем):** нативный Anthropic Messages API, долгосрочная память проекта, мультиагентность, Electron-упаковка, аутентификация сервера, редактор кода в UI, параллельные прогоны в одном workspace.
+**Отклонения от исходного задания и их причины:**
+
+1. Вместо `packages/{ui,api,shared}` — один общий слой `apps/shared`. Причина: `script/boundaries.ts` считает любой импорт, содержащий `packages/`, нарушением архитектуры; дробление на три пакета для MVP создавало бы файлы ради структуры.
+2. Проекты не захардкожены списком (`Axiom`, `PITY_NULL`), а регистрируются пользователем по пути: захардкоженный список был бы фейковой функцией. Тип проекта и проверки берутся из реального `detect()`.
+3. Anthropic подключён через её OpenAI-совместимый endpoint. Нативный Messages API потребовал бы нового `Provider` и правки `ModelConfig` в `src/domain` — это запрещено границами задачи.
+4. Добавлены не заявленные, но необходимые для работоспособности вещи: permission bridge (иначе прогон с проверками зависает), `resume` и адаптация сессий из журнала (иначе `UNKNOWN` и история задач — тупик).
+5. `script/check.ts` и корневой `tsconfig.json` изменены минимально: сканирование границ игнорирует `node_modules` внутри приложений, а браузерное приложение исключено из корневого typecheck (у него свой).
+
+**Вне границ v0.2 (осознанно не сделано):** нативный Anthropic Messages API, долгосрочная память проекта, мультиагентность, Electron-упаковка, аутентификация сервера, редактор кода в UI, параллельные прогоны в одном workspace.

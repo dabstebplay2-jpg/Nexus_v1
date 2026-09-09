@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import path from "node:path"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { ScriptedProvider, answer, brokenAdd, plainScenario } from "./helpers"
+import { ScriptedProvider, answer, brokenAdd, model, plainScenario } from "./helpers"
 import type { ModelEvent, ModelRequest } from "../src/domain/ports"
 import { hashFile } from "../src/tools/workspace"
 import { createNexusServer } from "../apps/server/index"
@@ -188,6 +188,51 @@ describe("Product layer: the MVP path", () => {
   }, 30000)
 })
 
+describe("Product layer: the event stream", () => {
+  test("frames carry no named event type, so a browser EventSource sees all of them", async () => {
+    const f = await harness({ "add.ts": brokenAdd, "scenario.ts": plainScenario }, async (_, turn) =>
+      turn === 1 ? await fixAdd(f.workspace) : answer("Corrected the operator."),
+    )
+    try {
+      const project = await f.project({ allowChecks: true, goalCommand })
+      const run = await f.jsonOf<RunSummary>(
+        await f.call("POST", "/runs", { projectId: project.id, goal: "Fix addition" }),
+      )
+      const response = await f.call("GET", `/runs/${run.id}/events`)
+      expect(response.headers.get("Content-Type")).toContain("text/event-stream")
+      const raw = await response.text()
+      // A named event field would need per-type listeners, and any new core event type would
+      // silently disappear from the interface.
+      expect(raw).not.toContain("\nevent: ")
+      expect(raw.split("\n\n").filter((frame) => frame.startsWith("id: ")).length).toBeGreaterThan(3)
+      expect(raw).toContain('"type":"run_finished"')
+    } finally {
+      await f.cleanup()
+    }
+  }, 30000)
+
+  test("a session this process never started can still be reported on", async () => {
+    const f = await harness({ "add.ts": brokenAdd, "scenario.ts": plainScenario }, () => answer("Nothing to do."))
+    try {
+      const project = await f.project()
+      // Created straight through the core, so the run manager has no record of it.
+      const session = await f.server.api.create({ workspace: f.workspace, goal: "Adopted session", model })
+      const summary = await f.jsonOf<RunSummary>(await f.call("GET", `/runs/${session.id}`))
+      expect(summary.goal).toBe("Adopted session")
+      expect(summary.running).toBe(false)
+      expect(summary.projectId).toBe(project.id)
+      const report = await f.jsonOf<RunReport>(await f.call("GET", `/runs/${session.id}/report`))
+      expect(report.sessionId).toBe(session.id)
+      expect(report.status).not.toBe("COMPLETED")
+      // Its recorded history is replayed from the ledger, not reconstructed.
+      const raw = await (await f.call("GET", `/runs/${session.id}/events`)).text()
+      expect(raw).toContain('"type":"created"')
+    } finally {
+      await f.cleanup()
+    }
+  }, 30000)
+})
+
 describe("Product layer: evidence before completion", () => {
   test("an unprovable check is reported as UNKNOWN over HTTP, with a way out", async () => {
     const f = await harness({ "add.ts": brokenAdd, "scenario.ts": sourceMutatingScenario }, () =>
@@ -238,6 +283,36 @@ describe("Product layer: evidence before completion", () => {
       expect(
         f.server.api.inspect(run.id).evidence.some((item) => item.source === "user" && item.kind === "GOAL_ASSERTION"),
       ).toBe(true)
+    } finally {
+      await f.cleanup()
+    }
+  }, 30000)
+
+  test("assert-goal then resume lets the completion policy promote the session", async () => {
+    // No goal command and no detected checks: the contract can only be closed by the user.
+    const f = await harness({ "add.ts": brokenAdd, "scenario.ts": plainScenario }, () => answer("Fixed it."))
+    try {
+      const project = await f.project()
+      const run = await f.jsonOf<RunSummary>(
+        await f.call("POST", "/runs", { projectId: project.id, goal: "Fix addition" }),
+      )
+      await streamEvents(await f.call("GET", `/runs/${run.id}/events`))
+      const before = await f.jsonOf<RunReport>(await f.call("GET", `/runs/${run.id}/report`))
+      expect(before.status).not.toBe("COMPLETED")
+      expect(before.decision?.outcome).toBe("NEEDS_USER_INPUT")
+      expect(before.affordances).toContain("assert-goal")
+      expect(before.affordances).toContain("resume")
+
+      await f.call("POST", `/runs/${run.id}/assert-goal`, { note: "Ran add(2,3) and got 5" })
+      const resumed = await f.jsonOf<RunSummary>(await f.call("POST", `/runs/${run.id}/resume`))
+      expect(resumed.running).toBe(true)
+      const events = await streamEvents(await f.call("GET", `/runs/${run.id}/events?cursor=${999}`))
+      expect(events.at(-1)?.type).toBe("run_finished")
+
+      const after = await f.jsonOf<RunReport>(await f.call("GET", `/runs/${run.id}/report`))
+      expect(after.status).toBe("COMPLETED")
+      expect(after.evidence.every((criterion) => criterion.met)).toBe(true)
+      expect(after.affordances).toEqual([])
     } finally {
       await f.cleanup()
     }

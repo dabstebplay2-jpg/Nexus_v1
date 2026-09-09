@@ -1,5 +1,4 @@
-import type { Capability, EvidenceKind, Status } from "../../src/domain/types"
-import type { RunReport } from "./run-report"
+import type { Capability, Decision, EvidenceKind, Status, Verdict } from "../../src/domain/types"
 
 /**
  * The wire contract between the Nexus API server and its clients.
@@ -22,6 +21,11 @@ export type ProjectSettings = {
   allowChecks: boolean
   /** Argv of the user's own scenario check. A stronger proof than the default contract. */
   goalCommand?: string[]
+}
+/** A settings patch. goalCommand accepts null to clear it. */
+export type ProjectPatch = Partial<Omit<ProjectSettings, "goalCommand">> & {
+  name?: string
+  goalCommand?: string[] | null
 }
 export type CheckSummary = { id: string; description: string; kind: EvidenceKind; argv: string[] }
 export type ProjectTask = {
@@ -132,4 +136,55 @@ export type DiffResponse = {
   processes: { actionId: string; tool: string; status: string; attribution: string }[]
 }
 export type ErrorResponse = { error: string; code?: string }
-export type { RunReport }
+export type ReportPlanStep = {
+  id: string
+  description: string
+  state: "PENDING" | "ACTIVE" | "DONE" | "BLOCKED"
+  note: string
+}
+export type ReportFileChange = { path?: string; added: number; removed: number; patch: string }
+export type ReportProcess = { actionId: string; tool: string; status: string; attribution: string }
+export type ReportCheck = {
+  checkId: string
+  verdict: Verdict
+  argv: string
+  exitCode?: number
+  unknownReason?: string
+  /** Files this check mutated while running, which is why its exit code cannot be attributed. */
+  sourceChanges: string[]
+  evidenceId: string
+}
+export type ReportCriterion = {
+  id: string
+  description: string
+  kind: EvidenceKind
+  expectedVerdict: Verdict
+  baseline: boolean
+  met: boolean
+  verdict?: Verdict
+  evidenceId?: string
+  /** The completion policy listed this criterion as the reason the run is not complete. */
+  unsatisfied: boolean
+}
+/** What a human can do next. Derived once so no client has to guess the way out of UNKNOWN. */
+export type ReportAffordance = "inspect" | "trust-checks" | "assert-goal" | "resolve-action" | "resume"
+export type RunReport = {
+  sessionId: string
+  goal: string
+  status: Status
+  project: string
+  model: string
+  branch: string
+  turns: number
+  toolCount: number
+  createdAt: number
+  updatedAt: number
+  decision?: Decision
+  plan: ReportPlanStep[]
+  changes: { files: ReportFileChange[]; processes: ReportProcess[] }
+  verification: ReportCheck[]
+  evidence: ReportCriterion[]
+  affordances: ReportAffordance[]
+  /** The model's closing message. Only trustworthy once the completion policy authorized COMPLETED. */
+  proposal?: { verified: boolean; text: string }
+}

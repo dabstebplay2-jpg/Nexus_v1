@@ -13,5 +13,5 @@
     "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "apps/**/*.ts", "test/**/*.ts", "script/**/*.ts", "bench/**/*.ts"],
-  "exclude": ["bench/fixtures", "dist", "node_modules"]
+  "exclude": ["bench/fixtures", "dist", "node_modules", "apps/web"]
 }
