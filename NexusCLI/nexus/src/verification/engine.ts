@@ -14,7 +14,17 @@ export class VerificationEngine {
     private readonly store: Store,
     private readonly executor: ToolExecutor,
   ) {}
-  async run(session: AgentSession, signal: AbortSignal, waiting: () => void, only?: string[]) {
+  /**
+   * @param traceParentId Trace node the resulting check calls nest under. Display only: it is
+   * forwarded to the executor untouched and never influences which checks run or what they prove.
+   */
+  async run(
+    session: AgentSession,
+    signal: AbortSignal,
+    waiting: () => void,
+    only?: string[],
+    traceParentId?: string,
+  ) {
     const run: VerificationRun = {
       id: crypto.randomUUID(),
       sessionId: session.id,
@@ -109,6 +119,7 @@ export class VerificationEngine {
         signal,
         waiting,
         { fingerprint: baseline, checkId: check.id },
+        traceParentId,
       )
       // Remember observed artifacts so later runs and completion decisions ignore them.
       const additions = learned.filter((file) => !isGenerated(file, session.contract.generatedPaths ?? []))

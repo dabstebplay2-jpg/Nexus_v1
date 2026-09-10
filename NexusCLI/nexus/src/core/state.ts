@@ -1,4 +1,4 @@
-import type { AgentSession, Status } from "../domain/types"
+import type { AgentSession, Event, Status } from "../domain/types"
 import type { EventSink, Store } from "../domain/ports"
 import { NexusError } from "../shared/errors"
 import { safeJson } from "../shared/redact"
@@ -39,8 +39,21 @@ export function transition(store: Store, session: AgentSession, next: Status, em
   })
   emit(event)
 }
-export function publish(store: Store, session: AgentSession, emit: EventSink, type: string, data: unknown) {
-  const event = {
+/**
+ * The single event publisher: one ledger row, one stream frame, redacted on the way through.
+ *
+ * Returns the stored event so a caller can correlate what it just published without inventing a
+ * second write path. Trace events use exactly this function; they are ordinary ledger events
+ * whose `data` happens to be a structured envelope.
+ */
+export function publish(
+  store: Store,
+  session: AgentSession,
+  emit: EventSink,
+  type: string,
+  data: unknown,
+): Event {
+  const event: Event = {
     id: crypto.randomUUID(),
     sessionId: session.id,
     timestamp: Date.now(),
@@ -49,4 +62,5 @@ export function publish(store: Store, session: AgentSession, emit: EventSink, ty
   }
   store.put("events", event)
   emit(event)
+  return event
 }

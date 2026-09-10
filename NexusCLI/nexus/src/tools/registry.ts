@@ -12,6 +12,12 @@ export type ToolContext = {
   signal: AbortSignal
   actionId: string
   waiting: () => void
+  /**
+   * Optional progress hook for tools that produce output incrementally. It records a
+   * STREAMING_OUTPUT phase on the trace timeline and nothing else: advisory only, never part of
+   * a result, an evidence record or a verdict.
+   */
+  progress?: (output: string) => void
 }
 export type ToolResult = {
   output: string

@@ -2,7 +2,9 @@ import type { Store } from "../domain/ports"
 import type { Action, AgentSession, Evidence, ToolCall } from "../domain/types"
 import type { PermissionEngine } from "../permissions/engine"
 import type { SandboxProvider } from "../sandbox/ports"
+import type { TraceRecorder } from "../core/trace"
 import type { Tool } from "./registry"
+import { traceRootId } from "../domain/trace"
 import { toolAllowed } from "../intelligence/intent"
 import { abort, errorText, NexusError } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
@@ -12,6 +14,8 @@ export class ToolExecutor {
     private readonly store: Store,
     private readonly permissions: PermissionEngine,
     private readonly sandbox: SandboxProvider,
+    /** Optional. Without a recorder the executor behaves exactly as before and traces nothing. */
+    private readonly trace?: TraceRecorder,
   ) {}
   async execute(
     session: AgentSession,
@@ -21,6 +25,8 @@ export class ToolExecutor {
     signal: AbortSignal,
     waiting: () => void,
     verification?: { fingerprint: string; checkId: string },
+    /** Trace node this call hangs from. Defaults to the run's root scope. */
+    traceParentId: string = traceRootId(session.id),
   ) {
     if (session.toolCount >= session.budgets.maxTools) throw new NexusError("BUDGET", "Tool budget exhausted")
     const action: Action = {
@@ -47,6 +53,23 @@ export class ToolExecutor {
     this.store.put("actions", action)
     session.toolCount++
     this.store.save(session)
+    // One tool call, one trace node, opened before anything can reject it: a call that is denied
+    // or fails input validation still appears in the timeline instead of vanishing.
+    const trace = this.trace?.tool(session, {
+      actionId: action.id,
+      parentId: traceParentId,
+      tool: tool.name,
+      title: `${verification ? "Verify" : "Tool"}: ${tool.name}`,
+      input: action.arguments,
+      metadata: {
+        callId: call.id,
+        turnId,
+        risk: action.risk,
+        sideEffect: action.sideEffect,
+        ...(verification ? { checkId: verification.checkId } : {}),
+      },
+    })
+    trace?.requested()
     try {
       abort(signal)
       if (!toolAllowed(session.intent, tool.name, session.contract.mode))
@@ -72,10 +95,18 @@ export class ToolExecutor {
           reason: tool.description,
         },
         signal,
-        waiting,
+        // The engine decides; the trace only records that a human was asked and when.
+        () => {
+          trace?.waitingPermission(
+            `${tool.name} needs approval for ${capabilities.join(", ") || "an unclassified capability"}`,
+          )
+          waiting()
+        },
       )
+      trace?.permissionResolved(true)
       action.status = "STARTED"
       this.store.put("actions", action)
+      trace?.started()
       const result = await tool.execute(input, {
         session,
         store: this.store,
@@ -83,6 +114,7 @@ export class ToolExecutor {
         signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(tool.timeout, session.budgets.toolTimeoutMs))]),
         actionId: action.id,
         waiting,
+        progress: (output: string) => trace?.streaming(output),
       })
       const safe = JSON.parse(safeJson(result)) as typeof result
       const evidence: Evidence = {
@@ -115,6 +147,37 @@ export class ToolExecutor {
         this.store.put("evidence", evidence)
         this.store.put("actions", action)
       })
+      // The Response half of the pair. Bounded independently of the model-facing output, because
+      // this copy is rendered rather than reasoned over.
+      const metadata = safe.metadata ?? {}
+      const exitCode = metadata.exitCode
+      const response = bound(safe.output, 1200)
+      const traceMetadata: Record<string, unknown> = {
+        actionId: action.id,
+        evidenceId: evidence.id,
+        verdict: evidence.verdict,
+        kind: evidence.kind,
+        status: action.status,
+        durationMs: (action.finishedAt ?? Date.now()) - action.startedAt,
+        outputChars: response.totalChars,
+        truncated: response.truncated,
+        ...(typeof exitCode === "number" ? { exitCode } : {}),
+      }
+      if (action.status === "FAILED")
+        trace?.failed(action.error ?? `${tool.name} reported a failing verdict`, response.text, traceMetadata)
+      else trace?.completed(response.text, traceMetadata)
+      // A diff node states *that* a file changed and proves it with the hashes already recorded on
+      // the action. File contents stay in the ledger and are served by the existing diff endpoint.
+      if (action.beforeHash || action.afterHash) {
+        const after = metadata.after
+        trace?.diff(`Changed ${String(metadata.path ?? action.target ?? tool.name)}`, {
+          path: metadata.path ?? action.target,
+          beforeHash: action.beforeHash,
+          afterHash: action.afterHash,
+          created: metadata.created === true,
+          ...(typeof after === "string" ? { bytes: after.length } : {}),
+        })
+      }
       return {
         action,
         evidence,
@@ -136,6 +199,13 @@ export class ToolExecutor {
       stored.error = redact(errorText(error))
       stored.finishedAt = Date.now()
       this.store.put("actions", stored)
+      if (error instanceof NexusError && error.code === "PERMISSION_DENIED")
+        trace?.permissionResolved(false, stored.error)
+      trace?.failed(stored.error ?? errorText(error), undefined, {
+        actionId: action.id,
+        status: stored.status,
+        code: error instanceof NexusError ? error.code : "UNEXPECTED",
+      })
       if (
         error instanceof NexusError &&
         ["PERMISSION_REQUIRED", "PERMISSION_DENIED", "UNKNOWN_EFFECT"].includes(error.code)

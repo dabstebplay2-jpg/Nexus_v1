@@ -1,4 +1,4 @@
-import type { AgentSession, ToolCall, Turn } from "../domain/types"
+import type { AgentSession, PlanStep, ToolCall, Turn, VerificationRun } from "../domain/types"
 import type { EventSink, Provider, Store } from "../domain/ports"
 import type { ContextManager } from "../context/manager"
 import type { ToolRegistry } from "../tools/registry"
@@ -13,6 +13,8 @@ import { recover } from "../recovery/policy"
 import { inventory, inventoryFingerprint } from "../verification/delta"
 import { abort, errorText, NexusError, createDeadline, isContextOverflow } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
+import { traceRootId, traceTurnId, type TraceNodeInput, type TraceStatus } from "../domain/trace"
+import { thinkingSummary, type TraceRecorder } from "./trace"
 import { publish, transition } from "./state"
 
 export type LoopDependencies = {
@@ -23,6 +25,12 @@ export type LoopDependencies = {
   executor: ToolExecutor
   verification: VerificationEngine
   emit: EventSink
+  /**
+   * Optional timeline recorder. It observes the loop, never steers it: every trace call below is
+   * a statement about something that already happened, so omitting the recorder changes nothing
+   * except that the timeline is empty.
+   */
+  trace?: TraceRecorder
 }
 export class AgentLoop {
   private readonly active = new Map<string, Promise<AgentSession>>()
@@ -50,7 +58,25 @@ export class AgentLoop {
     // Decisions are anchored to project source only, so generated output cannot stale evidence.
     const sourceFingerprint = async () =>
       inventoryFingerprint(await inventory(session.workspace, session.contract.generatedPaths ?? []))
+    const rootId = traceRootId(id)
+    const rootTitle = `Task: ${session.goal}`
+    const trace = (node: TraceNodeInput) => this.deps.trace?.node(session, node)
     try {
+      // The run's root scope. Re-published at the end with its outcome, which is how a resumed
+      // session reattaches to the same tree instead of starting a second one.
+      trace({
+        id: rootId,
+        type: "task",
+        status: "running",
+        title: rootTitle,
+        metadata: {
+          mode: session.contract.mode,
+          model: session.model.model,
+          project: session.project.kind,
+          intent: session.intent?.type,
+          resumed: wasCompleted,
+        },
+      })
       move("RECOVERING")
       const unknown = await recover(session, this.deps.store)
       if (unknown.length) {
@@ -96,12 +122,23 @@ export class AgentLoop {
           )
       ) {
         move("VERIFYING", "Reproduce the reported failure before changing files")
-        await this.deps.verification.run(
+        const reproductionId = `${id}:verification:reproduction`
+        trace({
+          id: reproductionId,
+          parentId: rootId,
+          type: "verification",
+          status: "running",
+          title: "Reproduce the reported failure",
+          metadata: { checks: reproduction, baseline: true },
+        })
+        const reproduced = await this.deps.verification.run(
           session,
           deadline,
           () => move("WAITING_PERMISSION", "reproduction"),
           reproduction,
+          reproductionId,
         )
+        trace(this.verificationNode(session, reproduced, reproductionId, rootId, "Reproduce the reported failure"))
         if (session.status === "WAITING_PERMISSION") move("VERIFYING")
         move("RECOVERING")
       }
@@ -164,6 +201,34 @@ export class AgentLoop {
           contextWindow: session.model.capabilities.contextLength,
           epoch: session.epoch,
         })
+        const turnNode = traceTurnId(id, turn.number)
+        trace({
+          id: turnNode,
+          parentId: rootId,
+          type: "turn",
+          status: "running",
+          title: `Turn ${turn.number}`,
+          metadata: { model: turn.model, epoch: session.epoch },
+        })
+        // Numbers and category names only, exactly like context_report: a context node must not
+        // become a second way to leak the prompt.
+        trace({
+          id: `${turnNode}:context`,
+          parentId: turnNode,
+          type: "context_update",
+          status: "success",
+          title: "Context assembled",
+          summary: `${turn.contextTokens} tokens of ${session.model.capabilities.contextLength}`,
+          metadata: {
+            epoch: session.epoch,
+            contextTokens: turn.contextTokens,
+            contextChars: turn.contextChars,
+            contextWindow: session.model.capabilities.contextLength,
+            stage: session.context?.stage,
+            mode: session.context?.mode,
+            utilisation: session.context?.report?.utilisation,
+          },
+        })
         const calls: ToolCall[] = []
         const parts: string[] = []
         const streamState = { finished: false }
@@ -209,6 +274,14 @@ export class AgentLoop {
             move("RECOVERING", "Context overflow: compress and resume without replaying tools")
             const retry = this.deps.context.recoverOverflow(session)
             publish(this.deps.store, session, this.deps.emit, "recovery", { code: "CONTEXT_OVERFLOW", action: "COMPRESS_CONTEXT", retry, turnId: turn.id })
+            trace({
+              id: `${turnNode}:context:overflow`,
+              parentId: turnNode,
+              type: "context_update",
+              status: retry ? "running" : "failed",
+              title: "Context overflow: compressed and resumed",
+              metadata: { retry, epoch: session.epoch, turnId: turn.id },
+            })
             if (retry) continue
             throw new NexusError("CONTEXT_CAPACITY", "Provider repeatedly rejected compressed context. History and changes are saved; adjust context configuration and resume.")
           }
@@ -218,6 +291,15 @@ export class AgentLoop {
             publish(this.deps.store, session, this.deps.emit, "recovery", { code: error.code, action: "RETRY_PROVIDER", attempt: transientRetries, turnId: turn.id })
             continue
           }
+          trace({
+            id: turnNode,
+            parentId: rootId,
+            type: "turn",
+            status: "failed",
+            title: `Turn ${turn.number}`,
+            ...(turn.error ? { summary: turn.error } : {}),
+            metadata: { model: turn.model, error: turn.error },
+          })
           throw error
         } finally {
           providerDeadline.close()
@@ -229,6 +311,26 @@ export class AgentLoop {
           ...(calls.length ? { toolCalls: JSON.parse(safeJson(calls)) as ToolCall[] } : {}),
         })
         this.deps.store.save(session)
+        // A summary of text the model already sent to the user. Not a chain of thought: nothing
+        // hidden is requested or recorded, and no decision below reads this node.
+        const narration = parts.join("").trim()
+        if (narration)
+          trace({
+            id: `${turnNode}:thinking`,
+            parentId: turnNode,
+            type: "thinking",
+            status: "success",
+            title: "Thinking summary",
+            summary: thinkingSummary(narration),
+            metadata: {
+              advisory: true,
+              influencesCompletion: false,
+              source: "assistant_message",
+              chars: narration.length,
+            },
+          })
+        const planBefore = planFingerprint(session.plan)
+        const observed: { tool: string; status: string }[] = []
         for (const call of calls) {
           abort(deadline)
           if (session.toolCount >= session.budgets.maxTools) throw new NexusError("BUDGET", "Tool budget exhausted")
@@ -239,7 +341,10 @@ export class AgentLoop {
             snapshot.resolve(call.name),
             deadline,
             () => move("WAITING_PERMISSION", call.name),
+            undefined,
+            turnNode,
           )
+          observed.push({ tool: call.name, status: result.action.status })
           session.conversation.push({ role: "tool", toolCallId: call.id, content: result.output })
           this.deps.store.save(session)
           publish(this.deps.store, session, this.deps.emit, "tool", {
@@ -252,7 +357,34 @@ export class AgentLoop {
             throw new NexusError("UNKNOWN_EFFECT", "Side effect has uncertain outcome; inspect before resuming")
           if (session.status === "WAITING_PERMISSION") move("ACTING")
         }
+        // The plan is owned by the update_plan tool; this only reports that it changed.
+        if (planFingerprint(session.plan) !== planBefore) trace(planNode(turnNode, session.plan))
         move("OBSERVING")
+        trace({
+          id: `${turnNode}:observation`,
+          parentId: turnNode,
+          type: "observation",
+          status: "success",
+          title: calls.length
+            ? `Observed ${calls.length} tool result${calls.length === 1 ? "" : "s"}`
+            : "No tool calls this turn",
+          ...(observed.length
+            ? { summary: observed.map((item) => `${item.tool}: ${item.status}`).join(", ") }
+            : {}),
+          metadata: {
+            toolCalls: calls.length,
+            results: observed,
+            failed: observed.filter((item) => item.status === "FAILED").length,
+          },
+        })
+        trace({
+          id: turnNode,
+          parentId: rootId,
+          type: "turn",
+          status: turn.status === "SUCCEEDED" ? "success" : "failed",
+          title: `Turn ${turn.number}`,
+          metadata: { model: turn.model, toolCalls: calls.length },
+        })
         if (calls.length) continue
         move("VERIFYING")
         if (session.contract.mode === "answer" && parts.join("").trim())
@@ -276,16 +408,54 @@ export class AgentLoop {
           this.deps.store.list("evidence", id),
           await sourceFingerprint(),
         )
-        if (session.contract.mode === "coding" && beforeVerification.outcome === "NEEDS_VERIFICATION")
-          await this.deps.verification.run(session, deadline, () => move("WAITING_PERMISSION", "verification"))
+        if (session.contract.mode === "coding" && beforeVerification.outcome === "NEEDS_VERIFICATION") {
+          const verificationId = `${turnNode}:verification`
+          trace({
+            id: verificationId,
+            parentId: rootId,
+            type: "verification",
+            status: "running",
+            title: "Run trusted checks",
+            metadata: { turn: turn.number, checks: session.contract.checks.map((check) => check.id) },
+          })
+          const run = await this.deps.verification.run(
+            session,
+            deadline,
+            () => move("WAITING_PERMISSION", "verification"),
+            undefined,
+            verificationId,
+          )
+          trace(this.verificationNode(session, run, verificationId, rootId, "Run trusted checks"))
+        }
         if (session.status === "WAITING_PERMISSION") move("VERIFYING")
-        session.decision = completionPolicy(
+        const completion = completionPolicy(
           session,
           this.deps.store.list("actions", id),
           this.deps.store.list("evidence", id),
           await sourceFingerprint(),
         )
+        session.decision = completion
         publish(this.deps.store, session, this.deps.emit, "completion", session.decision)
+        // Reported, not decided: the status below is a rendering of the policy's own outcome.
+        trace({
+          id: `${turnNode}:completion`,
+          parentId: rootId,
+          type: "completion",
+          status:
+            completion.outcome === "COMPLETE"
+              ? "success"
+              : completion.outcome === "INCOMPLETE" || completion.outcome === "NEEDS_VERIFICATION"
+                ? "running"
+                : "failed",
+          title: `Completion: ${completion.outcome}`,
+          summary: completion.reason,
+          metadata: {
+            outcome: completion.outcome,
+            missing: completion.missing,
+            authorizedBy: "completion_policy",
+            turn: turn.number,
+          },
+        })
         // Recheck durable admission after verification, which may have taken minutes.
         if (promote(this.deps.store, session, "STEER")) {
           move("ACTING")
@@ -335,9 +505,92 @@ export class AgentLoop {
       )
     } finally {
       session.activeMs = elapsed + Date.now() - started
+      try {
+        trace({
+          id: rootId,
+          type: "task",
+          status:
+            session.status === "COMPLETED"
+              ? "success"
+              : ["FAILED", "ABORTED", "UNKNOWN"].includes(session.status)
+                ? "failed"
+                : "running",
+          title: rootTitle,
+          ...(session.decision ? { summary: session.decision.reason } : {}),
+          metadata: {
+            status: session.status,
+            outcome: session.decision?.outcome,
+            turns: session.turns,
+            tools: session.toolCount,
+            activeMs: session.activeMs,
+          },
+        })
+      } catch {
+        // A timeline node must never replace the outcome of the run it describes.
+      }
       this.deps.store.save(session)
       release()
     }
     return session
+  }
+  /**
+   * Display status for a finished verification run. It reads the evidence the engine already
+   * wrote; the completion policy reaches its own conclusion from the same records, so this can
+   * never widen or soften what was proved.
+   */
+  private verificationNode(
+    session: AgentSession,
+    run: VerificationRun,
+    id: string,
+    parentId: string,
+    title: string,
+  ): TraceNodeInput {
+    const evidence = this.deps.store.list("evidence", session.id).filter((item) => run.evidenceIds.includes(item.id))
+    const passed = evidence.filter((item) => item.verdict === "pass").length
+    const status: TraceStatus = !evidence.length ? "pending" : passed === evidence.length ? "success" : "failed"
+    return {
+      id,
+      parentId,
+      type: "verification",
+      status,
+      title,
+      summary: evidence.length
+        ? `${passed}/${evidence.length} trusted checks passed`
+        : "No trusted check produced evidence",
+      metadata: {
+        runId: run.id,
+        checks: evidence.map((item) => ({
+          checkId: item.metadata.checkId,
+          verdict: item.verdict,
+          evidenceId: item.id,
+        })),
+      },
+    }
+  }
+}
+/** Plan revisions are detected by value, so a `plan` node is published only when it changed. */
+const planFingerprint = (plan: PlanStep[]) => plan.map((step) => `${step.id}:${step.state}`).join("|")
+function planNode(parentId: string, plan: PlanStep[]): TraceNodeInput {
+  const done = plan.filter((step) => step.state === "DONE").length
+  return {
+    id: `${parentId}:plan`,
+    parentId,
+    type: "plan",
+    status: plan.some((step) => step.state === "BLOCKED")
+      ? "failed"
+      : plan.length > 0 && done === plan.length
+        ? "success"
+        : "running",
+    title: "Plan updated",
+    summary: `${done}/${plan.length} steps done`,
+    metadata: {
+      total: plan.length,
+      steps: plan.slice(0, 20).map((step) => ({
+        id: step.id,
+        description: step.description,
+        state: step.state,
+        attempts: step.attempts,
+      })),
+    },
   }
 }
