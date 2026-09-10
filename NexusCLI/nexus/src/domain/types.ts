@@ -147,6 +147,51 @@ export type TaskIntent = {
   confidence: "high" | "low"
   reason: string
 }
+/**
+ * Context layers, in priority order.
+ *
+ * The prompt is assembled from these, not from "the whole transcript". L0 is what makes a run
+ * sound and is never dropped. L4 is durable in storage and is never resent: it is reachable only
+ * through `history` and `output(actionId)`, which is what keeps a long session from rotting the
+ * window it has left.
+ */
+export type ContextLayer = "L0_CRITICAL" | "L1_WORKING" | "L2_TASK_MEMORY" | "L3_PROJECT" | "L4_ARCHIVE"
+/** How aggressively low-priority context is given up. Derived from window utilisation, never set by a model. */
+export type CompactionStage = "normal" | "soft" | "hard" | "emergency"
+export type ContextCategory = {
+  key: string
+  layer: ContextLayer
+  tokens: number
+  /** Fraction of the admitted prompt. Zero for excluded categories. */
+  share: number
+  pinned: boolean
+  included: boolean
+}
+/**
+ * What the Context Engine did, and why. Recorded on the session and emitted as `context_report`.
+ *
+ * Numbers and category names only: no file contents, no message text, nothing redactable. That is
+ * deliberate, because this record is meant to reach a UI panel and a log without becoming a new
+ * way to leak workspace data.
+ */
+export type ContextReport = {
+  epoch: number
+  window: number
+  limit: number
+  output: number
+  used: number
+  free: number
+  utilisation: number
+  stage: CompactionStage
+  mode: "normal" | "prepare" | "compress"
+  /** Detail scale the assembled prompt was rendered at; 1 is full detail. */
+  detail: number
+  categories: ContextCategory[]
+  included: string[]
+  excluded: string[]
+  history: { messages: number; live: number; archived: number; summaries: number }
+  compression: { beforeTokens: number; afterTokens: number; saved: number }
+}
 export type AgentSession = {
   id: string
   workspace: string
@@ -160,7 +205,15 @@ export type AgentSession = {
   epoch: number
   epochStart: number
   summary: string
-  context?: { pressure: number; failures: number; inputTokens?: number; outputTokens?: number; mode?: "normal" | "prepare" | "compress" }
+  context?: {
+    pressure: number
+    failures: number
+    inputTokens?: number
+    outputTokens?: number
+    mode?: "normal" | "prepare" | "compress"
+    stage?: CompactionStage
+    report?: ContextReport
+  }
   model: ModelConfig
   budgets: Budgets
   turns: number

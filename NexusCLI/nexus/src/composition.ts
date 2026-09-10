@@ -17,6 +17,7 @@ import { inferGoalCheck } from "./completion/infer"
 import { contractMode, resolveIntent } from "./intelligence/intent"
 import type { TrustProfile } from "./intelligence/trust"
 import { detect } from "./project/detect"
+import { knowledgeSummary, projectKnowledge } from "./project/knowledge"
 import { gitBaseline } from "./git/baseline"
 import { agentChanges } from "./git/changes"
 import { rollback } from "./git/rollback"
@@ -108,7 +109,19 @@ export async function createNexus(options: {
   const loop = new AgentLoop({
     store,
     provider: options.provider ?? new OpenAICompatibleProvider(),
-    context: new ContextManager(store, [], undefined, emit),
+    // Project Intelligence is injected as an ordinary context source (L3), so the assembler can
+    // drop it under pressure without knowing what a project is.
+    context: new ContextManager(
+      store,
+      [
+        {
+          key: "ProjectKnowledge (L3)",
+          load: async (session) => knowledgeSummary(await projectKnowledge(session.workspace, session.project)),
+        },
+      ],
+      undefined,
+      emit,
+    ),
     registry,
     executor,
     verification,
