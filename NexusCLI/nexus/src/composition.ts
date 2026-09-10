@@ -10,6 +10,8 @@ import { OpenAICompatibleProvider } from "./llm/openai-compatible"
 import { ContextManager } from "./context/manager"
 import { AgentLoop } from "./core/agent-loop"
 import { publish } from "./core/state"
+import { TraceRecorder } from "./core/trace"
+import { traceTree } from "./trace/projection"
 import { admit } from "./session/inbox"
 import { defaultBudgets } from "./config/config"
 import { createContract } from "./completion/policy"
@@ -51,7 +53,15 @@ export async function createNexus(options: {
   // a container or job-object provider can replace it here alone.
   const sandbox = options.sandbox ?? new LocalSandboxProvider()
   const trust = options.trust ? { ...options.trust, workspace: await realpath(options.trust.workspace) } : undefined
-  const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission, trust), sandbox)
+  // One recorder, wired once, writing through the same publish()/EventSink as everything else.
+  // Its only consumers are the executor and the loop, which report what they already did.
+  const trace = new TraceRecorder(store, emit)
+  const executor = new ToolExecutor(
+    store,
+    new PermissionEngine(options.rules, options.permission, trust),
+    sandbox,
+    trace,
+  )
   const verification = new VerificationEngine(store, executor)
   const registry = new ToolRegistry()
   builtinTools().forEach((tool) => registry.register(tool))
@@ -75,10 +85,18 @@ export async function createNexus(options: {
         "Run trusted project checks and the user-selected goal scenario. Read verification evidence; fix failures before proposing completion.",
       input: z.object({}),
       execute: async (_, ctx) => {
-        const run = await verification.run(ctx.session, ctx.signal, () => {
-          ctx.waiting()
-          publish(store, ctx.session, emit, "permission", "Verification approval required")
-        })
+        const run = await verification.run(
+          ctx.session,
+          ctx.signal,
+          () => {
+            ctx.waiting()
+            publish(store, ctx.session, emit, "permission", "Verification approval required")
+          },
+          undefined,
+          // Nest each check under the verify call that asked for it, which is what produces the
+          // tool_call → tool_call → Input/Response depth in the timeline.
+          ctx.actionId,
+        )
         const evidence = store.list("evidence", ctx.session.id).filter((item) => run.evidenceIds.includes(item.id))
         const failed = store
           .list("actions", ctx.session.id)
@@ -126,6 +144,7 @@ export async function createNexus(options: {
     executor,
     verification,
     emit,
+    trace,
   })
   return {
     async create(input) {
@@ -196,6 +215,9 @@ export async function createNexus(options: {
       actions: store.list("actions", id),
       evidence: store.list("evidence", id),
       events: store.list("events", id),
+      // Derived from the events above on every read. Nothing new is stored, so the tree cannot
+      // drift from the ledger and it is identical after a restart.
+      trace: traceTree(store.list("events", id)),
       inputs: store.list("queued_inputs", id),
       turns: store.list("turns", id),
       epochs: store.list("context_epochs", id),

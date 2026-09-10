@@ -12,7 +12,9 @@ import type {
   Turn,
   VerificationRun,
 } from "./domain/types"
+import type { TraceNode } from "./domain/trace"
 export type { AgentSession, Check, Contract, Event, ModelConfig } from "./domain/types"
+export type { ToolPhase, TraceEvent, TraceEventType, TraceNode, TraceStatus } from "./domain/trace"
 
 /** UI boundary: clients submit commands and render events; they never mutate the runner. */
 export interface NexusAPI {
@@ -48,6 +50,11 @@ export interface NexusAPI {
     actions: Action[]
     evidence: Evidence[]
     events: Event[]
+    /**
+     * The same events folded into the trace tree. Derived on read, never stored, so it cannot
+     * disagree with the ledger and it is identical after a restart.
+     */
+    trace: TraceNode[]
     inputs: Input[]
     turns: Turn[]
     epochs: Epoch[]
