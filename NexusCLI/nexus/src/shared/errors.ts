@@ -11,6 +11,10 @@ export class NexusError extends Error {
 export function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
+export function isContextOverflow(error: unknown) {
+  if (error instanceof NexusError && error.code === "CONTEXT_OVERFLOW") return true
+  return /context[_\s-]*(?:length|window|size|limit).{0,80}(?:exceed|limit|long|small)|(?:exceed|too long|maximum).{0,100}(?:context|tokens)|\d+\s+tokens\s+exceeds?/i.test(errorText(error))
+}
 export function abort(signal: AbortSignal) {
   if (signal.aborted) throw new NexusError("ABORTED", "Execution interrupted")
 }

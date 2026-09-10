@@ -3,7 +3,13 @@ import type { AgentSession, Capability, EvidenceKind, Risk, Verdict } from "../d
 import type { Store, ToolSpec } from "../domain/ports"
 import { NexusError } from "../shared/errors"
 
-export type ToolContext = { session: AgentSession; store: Store; signal: AbortSignal; actionId: string }
+export type ToolContext = {
+  session: AgentSession
+  store: Store
+  signal: AbortSignal
+  actionId: string
+  waiting: () => void
+}
 export type ToolResult = {
   output: string
   kind?: EvidenceKind

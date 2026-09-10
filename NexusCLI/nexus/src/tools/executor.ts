@@ -47,13 +47,19 @@ export class ToolExecutor {
     try {
       abort(signal)
       const input = tool.inputSchema.parse(call.arguments)
+      const capabilities = tool.permissions(input)
+      if (capabilities.length && capabilities.every((capability) => capability === "READ")) {
+        action.risk = "low"
+        action.sideEffect = false
+        this.store.put("actions", action)
+      }
       await this.permissions.authorize(
         {
           sessionId: session.id,
           actionId: action.id,
           tool: tool.name,
           arguments: action.arguments,
-          capabilities: tool.permissions(input),
+          capabilities,
           reason: tool.description,
         },
         signal,
@@ -66,6 +72,7 @@ export class ToolExecutor {
         store: this.store,
         signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(tool.timeout, session.budgets.toolTimeoutMs))]),
         actionId: action.id,
+        waiting,
       })
       const safe = JSON.parse(safeJson(result)) as typeof result
       const evidence: Evidence = {
@@ -85,6 +92,10 @@ export class ToolExecutor {
         contractRevision: session.contract.revision,
       }
       action.status = evidence.verdict === "fail" ? "FAILED" : "SUCCEEDED"
+      if (action.status === "FAILED")
+        action.error = redact(
+          `Operation ${tool.name} failed: ${safeJson(action.arguments)}. ${String(safe.metadata?.failureReason ?? "Inspect the output, correct the cause, and run verification again.")} ${String(safe.metadata?.stderr ?? "")}`,
+        )
       action.result = safe
       action.beforeHash = safe.beforeHash
       action.afterHash = safe.afterHash
@@ -111,7 +122,7 @@ export class ToolExecutor {
         ["FILE_CONFLICT", "EDIT_MATCH", "BOUNDARY", "SECRET", "INPUT", "FILE_LIMIT", "PROCESS_START_FAILED"].includes(
           error.code,
         )
-      stored.status = stored.status === "STARTED" && tool.sideEffect && !beforeMutation ? "UNKNOWN" : "FAILED"
+      stored.status = stored.status === "STARTED" && stored.sideEffect && !beforeMutation ? "UNKNOWN" : "FAILED"
       stored.error = redact(errorText(error))
       stored.finishedAt = Date.now()
       this.store.put("actions", stored)

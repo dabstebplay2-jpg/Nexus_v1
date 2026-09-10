@@ -247,6 +247,11 @@ export class RunManager {
     this.require(id)
     return this.api.diff(id)
   }
+  rollback(id: string, actionId: string, note: string, signal?: AbortSignal) {
+    const run = this.require(id)
+    if (run.running) throw new NexusError("CONFLICT", "Wait for the active run to stop before rollback")
+    return this.api.rollback(id, actionId, note, signal)
+  }
   /** Replay from a cursor, then live delivery. Reconnecting a stream never loses an event. */
   subscribe(id: string, cursor: number, listener: (event: StreamEvent) => void) {
     const run = this.require(id)

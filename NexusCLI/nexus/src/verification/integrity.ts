@@ -6,7 +6,7 @@ export async function verificationAssets(workspace: string, commands: string[][]
   const commandFiles = commands.flat().filter((item) => /\.[cm]?[jt]s$|\.py$|\.sh$|\.ps1$/.test(item))
   const paths = (await files(workspace)).filter(
     (file) =>
-      /(^|[\\/])(?:package\.json|(?:test|spec)[^\\/]*[\\/]|[^\\/]*\.(test|spec)\.)|(^|[\\/])(?:pytest|vitest|jest|tsconfig)[^\\/]*|Cargo\.toml$|go\.mod$/.test(
+      /(^|[\\/])(?:package\.json|(?:test|spec)[^\\/]*[\\/]|[^\\/]*\.(test|spec)\.|test_[^\\/]*\.py|[^\\/]*_test\.py)|(^|[\\/])(?:pytest|vitest|jest|tsconfig)[^\\/]*|Cargo\.toml$|go\.mod$/.test(
         file,
       ) || commandFiles.some((item) => path.resolve(workspace, item) === path.resolve(workspace, file)),
   )

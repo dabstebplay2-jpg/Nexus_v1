@@ -143,7 +143,7 @@ export type PermissionRequest = { requestId: string; approved: boolean }
 export type NoteRequest = { note: string }
 export type ResolveActionRequest = { actionId: string; outcome: "VERIFIED" | "FAILED"; note: string }
 export type DiffResponse = {
-  patches: { actionId?: string; patch: string }[]
+  patches: { actionId?: string; path: string; patch: string; before: string; after: string; timestamp: number; beforeHash?: string; afterHash?: string; created: boolean; snapshotIntegrity: "verified" | "unavailable" }[]
   processes: { actionId: string; tool: string; status: string; attribution: string }[]
 }
 export type ErrorResponse = { error: string; code?: string }
@@ -153,7 +153,7 @@ export type ReportPlanStep = {
   state: "PENDING" | "ACTIVE" | "DONE" | "BLOCKED"
   note: string
 }
-export type ReportFileChange = { path?: string; added: number; removed: number; patch: string }
+export type ReportFileChange = { path?: string; added: number; removed: number; patch: string; before: string; after: string; timestamp: number; beforeHash?: string; afterHash?: string; actionId?: string; snapshotIntegrity: "verified" | "unavailable" }
 export type ReportProcess = { actionId: string; tool: string; status: string; attribution: string }
 export type ReportCheck = {
   checkId: string

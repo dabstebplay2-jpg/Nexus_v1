@@ -70,10 +70,13 @@ export class VerificationEngine {
             return {
               output: output.stdout + output.stderr,
               kind: check.kind,
-              verdict: untrusted ? "unknown" : output.exitCode === 0 ? "pass" : "fail",
+              verdict: untrusted ? "unknown" : output.exitCode === 0 && (check.expectedStdout === undefined || output.stdout.trim() === check.expectedStdout.trim()) ? "pass" : "fail",
               metadata: {
                 argv: check.argv,
                 exitCode: output.exitCode,
+                stdout: output.stdout,
+                stderr: output.stderr,
+                expectedStdout: check.expectedStdout,
                 attribution: delta.git ? "git" : "inventory",
                 sourceChanged: unattributable.length > 0,
                 sourceChanges: unattributable,

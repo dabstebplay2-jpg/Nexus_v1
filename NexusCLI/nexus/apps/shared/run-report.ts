@@ -34,7 +34,9 @@ function affordances(session: AgentSession, unknownActions: boolean): ReportAffo
   if (session.status === "UNKNOWN") return ["inspect", "trust-checks", "assert-goal", "resume"]
   const outcome = session.decision?.outcome
   return [
-    ...(outcome === "NEEDS_USER_INPUT" ? (["assert-goal", "resume"] as ReportAffordance[]) : []),
+    ...(outcome === "NEEDS_USER_INPUT"
+      ? ((session.errors.length ? ["inspect", "resume"] : ["assert-goal", "resume"]) as ReportAffordance[])
+      : []),
     ...(outcome === "BLOCKED" ? (["inspect"] as ReportAffordance[]) : []),
     ...(unknownActions ? (["resolve-action"] as ReportAffordance[]) : []),
   ]
@@ -75,6 +77,13 @@ export function buildRunReport(api: NexusAPI, id: string, session: AgentSession)
         path: patchFile(item.patch),
         ...countLines(item.patch),
         patch: item.patch,
+        before: item.before,
+        after: item.after,
+        timestamp: item.timestamp,
+        beforeHash: item.beforeHash,
+        afterHash: item.afterHash,
+        actionId: item.actionId,
+        snapshotIntegrity: item.snapshotIntegrity,
       })),
       // Trusted checks get their own section; listing them here as unattributable processes is noise.
       processes: changes.processes.filter((item) => !item.tool.startsWith("check_")),
@@ -97,10 +106,14 @@ export function buildRunReport(api: NexusAPI, id: string, session: AgentSession)
     evidence: session.contract.criteria
       .filter((criterion) => criterion.required)
       .map((criterion) => {
-        const backing = evidence.filter((item) =>
-          criterion.checkId
-            ? item.source === "verification" && item.metadata.checkId === criterion.checkId
-            : item.kind === criterion.kind && item.source !== "tool",
+        const backing = evidence.filter(
+          (item) =>
+            item.contractRevision === session.contract.revision &&
+            item.kind === criterion.kind &&
+            (!criterion.baseline || item.fingerprint === session.contract.baselineFingerprint) &&
+            (criterion.checkId
+              ? item.source === "verification" && item.metadata.checkId === criterion.checkId
+              : item.source === "user" || (session.contract.mode === "answer" && item.source === "core")),
         )
         const expectedVerdict = criterion.expectedVerdict ?? "pass"
         // A baseline criterion is proved by the run that failed, not by the most recent run.
@@ -111,7 +124,7 @@ export function buildRunReport(api: NexusAPI, id: string, session: AgentSession)
           kind: criterion.kind,
           expectedVerdict,
           baseline: criterion.baseline ?? false,
-          met: backed?.verdict === expectedVerdict,
+          met: backed?.verdict === expectedVerdict && !unmet.has(criterion.id),
           verdict: backed?.verdict,
           evidenceId: backed?.id,
           unsatisfied: unmet.has(criterion.id),

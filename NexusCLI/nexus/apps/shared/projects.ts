@@ -4,6 +4,7 @@ import { z } from "zod"
 import { NexusError } from "../../src/shared/errors"
 import type { ProjectSettings } from "./protocol"
 import { endpointSchema, keyEnvSchema } from "./models"
+import { atomicWrite } from "../../src/tools/workspace"
 
 /**
  * Project registry — the foundation for project memory.
@@ -56,7 +57,7 @@ export class ProjectRegistry {
     return parsed.data.projects
   }
   private async write(projects: ProjectRecord[]) {
-    await Bun.write(this.file, JSON.stringify({ projects }, null, 2))
+    await atomicWrite(this.file, JSON.stringify({ projects }, null, 2))
   }
   private mutate<T>(operation: (projects: ProjectRecord[]) => Promise<{ projects: ProjectRecord[]; result: T }>) {
     const next = this.gate.then(async () => {
