@@ -3,12 +3,9 @@
 **Scope:** agent orchestration only. No UI redesign, no new providers or models, no storage rewrite, and
 **no change to `CompletionPolicy`** — it remains the sole authority that may authorise `COMPLETED`.
 
-**Status of the quality gate:** `bun run check` was **NOT executed** by the author of this change set.
-The environment used to produce it has no Bun runtime and no network access. What *was* executed is a
-Node-based harness over the four new pure modules: **17/17 assertions pass** (output in
-`local-evidence/harness-output.txt`). Everything that touches the loop, the executor, the permission
-engine and Bun's test runner is **unverified** and must be run by you. See
-[§8 Verification status](#8-verification-status).
+**Integration status (2026-09-10):** the runtime wiring in §8 is applied. Verification results are
+recorded in [§9 Verification status](#9-verification-status). The original Node harness was only
+module-level evidence; the integration is now checked with the real Bun quality gate.
 
 ---
 
@@ -131,6 +128,9 @@ The classification order is deliberate:
 - **`resolveIntent` yields to an explicit contract mode.** If the caller asks for `mode: "coding"`,
   the read-only tool restriction is dropped. A coding contract whose tools cannot produce evidence is
   an unprovable contract, and an unprovable contract is exactly what this release is trying to remove.
+- **An explicit `goalCheck` preserves the existing coding contract when `mode` is omitted.** The
+  composition root passes this choice to `resolveIntent`; a supplied check must remain executable.
+  An explicitly supplied `mode` still takes precedence.
 
 ---
 
@@ -263,13 +263,17 @@ of the answer and the safety floor around it.
 - **Later rules win**, so an operator can append `{ "bun run deploy", deny }` after `{ "bun *", allow }`
   without rewriting the list.
 - **Explicit `options.rules` always beat level defaults**, so every existing test keeps its behaviour.
+- **Profiles are workspace-scoped.** Composition resolves the profile workspace with `realpath`;
+  the executor passes the session workspace in the optional `PermissionRequest.workspace` field.
+  Both level defaults and command rules apply only to that workspace. Missing workspace context
+  uses the existing engine policy without profile grants.
 
 ---
 
 ## 8. Changed files
 
-Five existing files need small, anchored edits. **These edits are specified but not applied** — see
-§9. Each is a search-and-replace on a unique anchor.
+The five planned integration points are applied, plus an optional workspace field in
+`src/domain/ports.ts` to scope trust. The excerpts below describe the applied wiring.
 
 ### 8.1 `src/domain/types.ts` — additive only
 
@@ -302,18 +306,18 @@ unchanged. `SqliteStore` serialises the session header as raw JSON and reads it 
 ```ts
 // add imports
 import { contractMode, resolveIntent } from "./intelligence/intent"
-import { levelRules, type TrustProfile } from "./intelligence/trust"
+import type { TrustProfile } from "./intelligence/trust"
 
 // add to the options object of createNexus
   trust?: TrustProfile
 
 // replace:
 //   const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission), sandbox)
-const rules: Rules = { ...(options.trust ? levelRules(options.trust.level) : {}), ...options.rules }
-const executor = new ToolExecutor(store, new PermissionEngine(rules, options.permission, options.trust), sandbox)
+const trust = options.trust ? { ...options.trust, workspace: await realpath(options.trust.workspace) } : undefined
+const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission, trust), sandbox)
 
 // in create(), replace the goalCheck/contract pair:
-const intent = resolveIntent(input.goal, input.mode)
+const intent = resolveIntent(input.goal, input.mode ?? (input.goalCheck ? "coding" : undefined))
 const mode = input.mode ?? contractMode(intent)
 const goalCheck = input.goalCheck ?? (mode === "answer" ? undefined : await inferGoalCheck(workspace, input.goal))
 const contract = createContract(redact(input.goal), project, mode, goalCheck)
@@ -345,14 +349,19 @@ code, so `shared/errors.ts` is untouched.
 ### 8.4 `src/permissions/engine.ts`
 
 ```ts
-import { matchPermission, type TrustProfile } from "../intelligence/trust"
+import path from "node:path"
+import { levelRules, matchPermission, type TrustProfile } from "../intelligence/trust"
 
 // third constructor parameter (optional -- every existing call site is unchanged):
     private readonly trust?: TrustProfile,
 
 // in authorize(), replace `const decision = this.evaluate(request.capabilities)` with:
-    const baseline = this.evaluate(request.capabilities)
-    const trusted = matchPermission(this.trust, {
+    const trust =
+      this.trust && request.workspace && path.relative(this.trust.workspace, request.workspace) === ""
+        ? this.trust
+        : undefined
+    const baseline = this.evaluate(request.capabilities, { ...(trust ? levelRules(trust.level) : {}), ...this.rules })
+    const trusted = matchPermission(trust, {
       action: request.tool,
       command:
         typeof request.arguments === "object" && request.arguments && "command" in request.arguments
@@ -363,8 +372,9 @@ import { matchPermission, type TrustProfile } from "../intelligence/trust"
     const decision = baseline === "deny" || trusted?.permission === "deny" ? "deny" : (trusted?.permission ?? baseline)
 ```
 
-`evaluate()` itself is unchanged, so `commandCapabilities` and every existing permission test behave
-exactly as before.
+`evaluate()` accepts an optional rules argument defaulting to its existing rules. Its precedence and
+defaults are unchanged, as is `commandCapabilities`. Level defaults are merged at authorization time,
+after the workspace match, rather than globally in composition.
 
 ### 8.5 `src/core/agent-loop.ts` — three edits
 
@@ -391,8 +401,9 @@ if (decision) {
     reason: decision.reason,
     source: decision.source,
   })
-  // REQUEST_USER_INPUT terminates the run the same way the existing STOP branch does:
-  // record the reason, transition to FAILED, return. Keep the existing STOP code as-is.
+  // STOP retains BLOCKED; REQUEST_USER_INPUT records NEEDS_USER_INPUT. Both end in FAILED.
+  // Existing loop_guard events are retained. COMPACT_CONTEXT still compacts even when
+  // error-memory guidance takes precedence over the generic guard guidance.
   // Otherwise inject the guidance and continue the loop:
   session.conversation.push({ role: "system", content: decision.guidance })
 }
@@ -406,47 +417,50 @@ Edit (a) is behaviour-preserving for every pre-v0.2.3 session: with no intent, `
 
 ## 9. Verification status
 
-### What was executed
+### Executed on 2026-09-10
 
-A Node 24 harness (`local-evidence/harness.ts`, run with `tsx --test`) exercising the four new modules
-against a shim of `domain/types` plus **verbatim copies** of `completion/intent.ts` and the `canonical`
-helper from `loop-guard/policy.ts`:
+Final `bun run check`, from `NexusCLI/nexus`, exited with code 0 on Windows. The package gate used
+Bun 1.3.14. All seven checks passed:
 
+```text
+Check summary
+  typecheck   PASS      2.0s
+  boundaries  PASS      0.2s
+  test        PASS     52.4s
+  bench       PASS      1.6s
+  build       PASS      0.7s
+  smoke       PASS      1.5s
+  product     PASS      0.7s
+
+All 7 checks passed
 ```
-ℹ tests 17
-ℹ pass 17
-ℹ fail 0
-```
 
-Coverage: the classification table and all three mandated goals; the read-only tool matrix; the
-legacy `intent === undefined` path; failure counting, success-reset and both thresholds; supervisor
-precedence including byte-identical guard guidance; trust matching, wildcards, later-rule-wins, the
-`NEVER_AUTOMATIC` floor and profile parsing. Formatting was checked with the repo's Prettier config
-(`{ "semi": false, "printWidth": 120 }`) and the modules are clean.
+Tests: **159 pass, 0 fail**, across 15 files. The two intelligence suites account for 14 tests.
+They cover the three required scenarios, read-only tool filtering and refusal before input parsing,
+legacy persisted sessions without intent, supervisor escalation, permission deny precedence,
+sensitive-capability approval, and isolation of both command rules and trust levels by workspace.
 
-The harness also caught one real defect that review had missed — the `"что"`/`"чтобы"` prefix collision
-described in §3.
+Full gates were run after adding types (6/7), wiring runtime (6/7), fixing integration compatibility
+(7/7), and adding regression coverage (7/7). Two additional issues surfaced during wiring:
 
-### What was NOT executed
+- The new repair fixture omitted the existing mandatory `expectedHash`. It now reads before writing
+  and additionally asserts `COMPLETED`; production write validation was not relaxed.
+- A legacy analysis scenario supplied an explicit `goalCheck`. Such requests retain coding mode
+  unless the caller explicitly chooses a different mode, preserving executable trusted evidence.
 
-- **`bun run check` (typecheck · boundaries · test · bench · build · smoke · product).** No Bun and no
-  network in the authoring environment. The v0.2.2 baseline is 7/7 PASS, 142 pass / 3 skip / 0 fail.
-- **`test/agent-intelligence.test.ts`.** It uses `bun:test` and the real `fixtureWith` harness.
-- **The five wiring edits in §8.** They are specified against verified anchors, but they were never
-  compiled or run.
+The original four pure intelligence modules, CompletionPolicy, storage schema, and legacy test files
+were not changed. The original Node harness (17 assertions) is historical module-only evidence;
+the real package gate above supersedes it for integration validation.
 
 ### Reproduce
 
 ```bash
 cd NexusCLI/nexus
-bun install
 bun run check
-bun test ./test/agent-intelligence.test.ts
-bunx prettier --check src test
+bun test ./test/agent-intelligence.test.ts ./test/agent-intelligence-integration.test.ts
 ```
 
-Expected after the change: 145 pass / 3 skip / 0 fail, 7/7 gate steps green. Any deviation is a bug in
-this change set, not in the baseline.
+Trust profiles remain a programmatic option with no persistence or UI, as scoped in the design.
 
 ---
 
@@ -457,7 +471,7 @@ this change set, not in the baseline.
 | Do not rewrite the core | Four new pure modules; the loop changes by three anchored edits |
 | Do not break `CompletionPolicy` | Not modified. Read-only tasks reuse the existing `answer` contract |
 | Keep "evidence before completion" | Unchanged for mutating tasks. For analysis the answer *is* the deliverable, asserted against an unchanged fingerprint |
-| Preserve existing tests | Every v0.2.2 goal used by the suite still classifies mutating/`coding` — asserted in the harness. Default rules, `evaluate()` and `loopGuard` are untouched |
+| Preserve existing tests | Legacy scenarios remain covered, including explicit `goalCheck` contracts. The new repair fixture now reads before writing with `expectedHash`; its assertions were strengthened, not removed. Default permission precedence and `loopGuard` are unchanged |
 | Agent Intelligence Layer only | No UI, provider, model or storage change; storage needs no migration |
 
 ## 11. Known limitations

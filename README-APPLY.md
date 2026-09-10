@@ -1,9 +1,9 @@
-# Nexus v0.2.3 - Agent Intelligence Layer (change set)
+# Nexus v0.2.3 - Agent Intelligence Layer (integrated)
 
-The GitHub token available to the author is read-only (`403 Resource not accessible by personal
-access token` on branch creation), so this could not be pushed as a branch/PR. Apply it manually.
+The integration is applied on `nexus-v0.2.3-agent-intelligence`. No manual copying or anchored
+replacements are needed. See `NEXUS_AGENT_INTELLIGENCE_REVIEW.md` for architecture and verification.
 
-## 1. Copy the new files into the repo (paths already mirror the repo layout)
+## Included intelligence modules
 
     NexusCLI/nexus/src/intelligence/intent.ts
     NexusCLI/nexus/src/intelligence/memory.ts
@@ -12,17 +12,21 @@ access token` on branch creation), so this could not be pushed as a branch/PR. A
     NexusCLI/nexus/test/agent-intelligence.test.ts
     NEXUS_AGENT_INTELLIGENCE_REVIEW.md            <- repo root
 
-## 2. Apply the five anchored edits
+## Runtime integration
 
-See section 8 of NEXUS_AGENT_INTELLIGENCE_REVIEW.md:
+Section 8 of NEXUS_AGENT_INTELLIGENCE_REVIEW.md documents the applied changes:
 src/domain/types.ts, src/composition.ts, src/tools/executor.ts,
 src/permissions/engine.ts, src/core/agent-loop.ts
 
-## 3. Run the gate (NOT run by the author - no bun, no network)
+`src/domain/ports.ts` also carries optional workspace context for scoped trust profiles.
+Old sessions without intent remain supported; CompletionPolicy is unchanged.
 
-    cd NexusCLI/nexus && bun install && bun run check
+## Run the gate
+
+    cd NexusCLI/nexus
+    bun run check
 
 ## local-evidence/
 
-What WAS executed: a Node harness over the four pure modules, 17/17 pass.
+Historical module-only evidence: a Node harness over the four pure modules, 17/17 pass.
 Run it with:  node --import tsx --test harness.ts   (needs the shim, see the review doc)
