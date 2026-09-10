@@ -63,7 +63,7 @@ export async function detect(workspace: string): Promise<Project> {
       roots: [workspace],
       checks: [check("test", "TEST_RESULT", ["dotnet", "test"]), check("build", "BUILD_RESULT", ["dotnet", "build"])],
     }
-  if (paths.includes("pyproject.toml") || paths.includes("requirements.txt"))
+  if (paths.includes("pyproject.toml") || paths.includes("requirements.txt") || paths.some(file => /(^|[\\/])(?:test_[^\\/]+|[^\\/]+_test)\.py$/.test(file)))
     return {
       kind: "Python",
       packageManager: paths.includes("uv.lock") ? "uv" : "pip",
@@ -72,5 +72,7 @@ export async function detect(workspace: string): Promise<Project> {
         check("test", "TEST_RESULT", paths.includes("uv.lock") ? ["uv", "run", "pytest"] : ["python", "-m", "pytest"]),
       ],
     }
+  if (paths.some(file => /\.(test|spec)\.[cm]?[jt]s$/.test(file)))
+    return { kind: "JavaScript/TypeScript", packageManager: "bun", roots: [workspace], checks: [check("test", "TEST_RESULT", ["bun", "test"])] }
   return { kind: "Unknown", roots: [path.resolve(workspace)], checks: [] }
 }

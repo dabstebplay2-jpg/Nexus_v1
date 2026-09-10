@@ -9,7 +9,7 @@ import { loopGuard } from "../loop-guard/policy"
 import { promote } from "../session/inbox"
 import { recover } from "../recovery/policy"
 import { inventory, inventoryFingerprint } from "../verification/delta"
-import { abort, errorText, NexusError, createDeadline } from "../shared/errors"
+import { abort, errorText, NexusError, createDeadline, isContextOverflow } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
 import { publish, transition } from "./state"
 
@@ -34,6 +34,8 @@ export class AgentLoop {
   }
   private async drain(id: string, signal: AbortSignal) {
     const session = this.deps.store.get(id)
+    const wasCompleted = session.status === "COMPLETED"
+    let transientRetries = 0
     const release = this.deps.store.acquire(id, session.workspace)
     const started = Date.now()
     const elapsed = session.activeMs
@@ -60,6 +62,22 @@ export class AgentLoop {
         return session
       }
       session.errors = []
+      // Reopening a proved task must not spend another model turn or replay tools.
+      // Re-evaluate against current source, and never swallow newly admitted input.
+      if (wasCompleted && !this.deps.store.list("queued_inputs", id).some((input) => !input.promoted)) {
+        const decision = completionPolicy(
+          session,
+          this.deps.store.list("actions", id),
+          this.deps.store.list("evidence", id),
+          await sourceFingerprint(),
+        )
+        if (decision.outcome === "COMPLETE") {
+          session.decision = decision
+          move("VERIFYING", "Revalidate existing evidence against current source")
+          move("COMPLETED", decision.reason)
+          return session
+        }
+      }
       const reproduction = session.contract.criteria
         .filter((criterion) => criterion.baseline && criterion.checkId)
         .map((criterion) => criterion.checkId!)
@@ -108,7 +126,7 @@ export class AgentLoop {
         move("ACTING")
         const snapshot = this.deps.registry.capture()
         const specs = session.contract.mode === "answer" ? [] : snapshot.specs
-        const specTokens = this.deps.context.countText(safeJson(specs))
+        const specTokens = this.deps.context.toolTokens(specs)
         const messages = await this.deps.context.build(session, specTokens)
         const turn: Turn = {
           id: crypto.randomUUID(),
@@ -140,7 +158,7 @@ export class AgentLoop {
             model: session.model,
             messages,
             tools: specs,
-            maxTokens: session.budgets.maxOutputTokens,
+            maxTokens: this.deps.context.budget(session).output,
             signal: providerDeadline.signal,
           })) {
             abort(deadline)
@@ -163,13 +181,26 @@ export class AgentLoop {
           if (calls.length && (session.contract.mode === "answer" || !session.model.capabilities.toolCalling))
             throw new NexusError("CAPABILITY", "Tools are unavailable in this mode/model")
           turn.status = "SUCCEEDED"
+          transientRetries = 0
+          if (session.context) session.context.failures = 0
         } catch (error) {
           turn.status = "FAILED"
           turn.error = redact(errorText(error))
           this.deps.store.put("turns", turn)
-          if (error instanceof NexusError && error.code === "CONTEXT_OVERFLOW" && session.epoch < 3) {
-            this.deps.context.compact(session)
-            move("RECOVERING", error.message)
+          if (isContextOverflow(error)) {
+            // A rejected request executed no tools. Keep its Turn audit record but do not
+            // consume a work-turn budget merely to compress and retry the same turn.
+            session.turns--
+            move("RECOVERING", "Context overflow: compress and resume without replaying tools")
+            const retry = this.deps.context.recoverOverflow(session)
+            publish(this.deps.store, session, this.deps.emit, "recovery", { code: "CONTEXT_OVERFLOW", action: "COMPRESS_CONTEXT", retry, turnId: turn.id })
+            if (retry) continue
+            throw new NexusError("CONTEXT_CAPACITY", "Provider repeatedly rejected compressed context. History and changes are saved; adjust context configuration and resume.")
+          }
+          if (error instanceof NexusError && error.retryable && transientRetries++ < 2 && !deadline.aborted) {
+            session.turns--
+            move("RECOVERING", "Transient provider failure; retry the unexecuted turn")
+            publish(this.deps.store, session, this.deps.emit, "recovery", { code: error.code, action: "RETRY_PROVIDER", attempt: transientRetries, turnId: turn.id })
             continue
           }
           throw error
@@ -271,7 +302,7 @@ export class AgentLoop {
       const message = redact(errorText(error))
       session.errors.push(message)
       session.decision = {
-        outcome: error instanceof NexusError && error.code.startsWith("PERMISSION") ? "NEEDS_USER_INPUT" : "BLOCKED",
+        outcome: error instanceof NexusError && (error.code.startsWith("PERMISSION") || error.code === "CONTEXT_CAPACITY") ? "NEEDS_USER_INPUT" : "BLOCKED",
         reason: message,
         missing: [],
       }
@@ -284,7 +315,7 @@ export class AgentLoop {
           ? "ABORTED"
           : error instanceof NexusError && error.code === "PERMISSION_REQUIRED"
             ? "WAITING_PERMISSION"
-            : "FAILED",
+            : error instanceof NexusError && error.code === "CONTEXT_CAPACITY" ? "WAITING_CONTEXT" : "FAILED",
         message,
       )
     } finally {

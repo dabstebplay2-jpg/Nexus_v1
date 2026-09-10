@@ -53,6 +53,7 @@ const createRun = z.object({
 const promptBody = z.object({ text: z.string().min(1), delivery: z.enum(["STEER", "QUEUE"]).optional() })
 const permissionBody = z.object({ requestId: z.string().min(1), approved: z.boolean() })
 const noteBody = z.object({ note: z.string().min(1) })
+const rollbackBody = z.object({ actionId: z.string().min(1), note: z.string().min(1).max(2000) })
 const resolveBody = z.object({
   actionId: z.string().min(1),
   outcome: z.enum(["VERIFIED", "FAILED"]),
@@ -63,6 +64,9 @@ const status: Record<string, number> = {
   INPUT: 400,
   CONFIG: 400,
   CONFLICT: 409,
+  FILE_CONFLICT: 409,
+  ROLLBACK_UNAVAILABLE: 409,
+  BUSY: 409,
   PERMISSION_DENIED: 403,
   PERMISSION_REQUIRED: 403,
   STATE: 409,
@@ -277,6 +281,11 @@ export function createRouter(deps: ServerDeps) {
       if (method === "GET" && action === "diff") {
         await deps.runs.adopt(id)
         return json(deps.runs.diff(id), headers)
+      }
+      if (method === "POST" && action === "rollback") {
+        await deps.runs.adopt(id)
+        const input = await body(request, rollbackBody)
+        return json(await deps.runs.rollback(id, input.actionId, input.note, request.signal), headers)
       }
       if (method === "POST" && action === "prompt") {
         const input = await body(request, promptBody)

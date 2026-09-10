@@ -7,6 +7,7 @@ export type Status =
   | "VERIFYING"
   | "RECOVERING"
   | "WAITING_PERMISSION"
+  | "WAITING_CONTEXT"
   | "COMPLETED"
   | "FAILED"
   | "UNKNOWN"
@@ -78,7 +79,7 @@ export type PlanStep = {
   evidence: string[]
   note: string
 }
-export type Check = { id: string; description: string; kind: EvidenceKind; argv: string[]; timeoutMs: number }
+export type Check = { id: string; description: string; kind: EvidenceKind; argv: string[]; timeoutMs: number; expectedStdout?: string }
 export type Criterion = {
   id: string
   description: string
@@ -122,6 +123,7 @@ export type AgentSession = {
   epoch: number
   epochStart: number
   summary: string
+  context?: { pressure: number; failures: number; inputTokens?: number; outputTokens?: number; mode?: "normal" | "prepare" | "compress" }
   model: ModelConfig
   budgets: Budgets
   turns: number

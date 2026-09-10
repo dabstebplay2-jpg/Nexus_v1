@@ -12,9 +12,11 @@ import { publish } from "./core/state"
 import { admit } from "./session/inbox"
 import { defaultBudgets } from "./config/config"
 import { createContract } from "./completion/policy"
+import { inferGoalCheck } from "./completion/infer"
 import { detect } from "./project/detect"
 import { gitBaseline } from "./git/baseline"
 import { agentChanges } from "./git/changes"
+import { rollback } from "./git/rollback"
 import { PermissionEngine, type Rules } from "./permissions/engine"
 import { ToolRegistry, defineTool } from "./tools/registry"
 import { builtinTools } from "./tools/builtin"
@@ -62,13 +64,33 @@ export async function createNexus(options: {
         "Run trusted project checks and the user-selected goal scenario. Read verification evidence; fix failures before proposing completion.",
       input: z.object({}),
       execute: async (_, ctx) => {
-        const run = await verification.run(ctx.session, ctx.signal, () =>
-          publish(store, ctx.session, emit, "permission", "Verification approval required"),
-        )
+        const run = await verification.run(ctx.session, ctx.signal, () => {
+          ctx.waiting()
+          publish(store, ctx.session, emit, "permission", "Verification approval required")
+        })
+        const evidence = store.list("evidence", ctx.session.id).filter((item) => run.evidenceIds.includes(item.id))
+        const failed = store
+          .list("actions", ctx.session.id)
+          .some((action) => action.turnId === run.id && action.status === "FAILED")
+        const complete = evidence.length > 0 && evidence.length === ctx.session.contract.checks.length
         return {
-          output: JSON.stringify(
-            store.list("evidence", ctx.session.id).filter((item) => run.evidenceIds.includes(item.id)),
-          ),
+          output: JSON.stringify(evidence),
+          verdict:
+            failed || evidence.some((item) => item.verdict === "fail")
+              ? "fail"
+              : !complete || evidence.some((item) => item.verdict === "unknown")
+                ? "unknown"
+                : "pass",
+          metadata: {
+            verificationRunId: run.id,
+            evidenceIds: run.evidenceIds,
+            ...(complete
+              ? {}
+              : {
+                  unknownReason:
+                    "No checks or missing check results; configure a trusted goal check and inspect verification actions.",
+                }),
+          },
         }
       },
     }),
@@ -76,7 +98,7 @@ export async function createNexus(options: {
   const loop = new AgentLoop({
     store,
     provider: options.provider ?? new OpenAICompatibleProvider(),
-    context: new ContextManager(store),
+    context: new ContextManager(store, [], undefined, emit),
     registry,
     executor,
     verification,
@@ -87,7 +109,8 @@ export async function createNexus(options: {
       const workspace = await realpath(input.workspace)
       if (!input.goal.trim()) throw new NexusError("INPUT", "A goal is required")
       const project = await detect(workspace)
-      const contract = createContract(redact(input.goal), project, input.mode ?? "coding", input.goalCheck)
+      const goalCheck = input.goalCheck ?? (input.mode === "answer" ? undefined : await inferGoalCheck(workspace, input.goal))
+      const contract = createContract(redact(input.goal), project, input.mode ?? "coding", goalCheck)
       contract.protectedFiles = await verificationAssets(
         workspace,
         contract.checks.map((check) => check.argv),
@@ -137,6 +160,7 @@ export async function createNexus(options: {
     prompt: (id, text, delivery = "STEER", messageId) => admit(store, id, text, delivery, messageId),
     sessions: () => store.sessions(),
     diff: (id) => agentChanges(store, id),
+    rollback: (id, actionId, note, signal) => rollback(store, executor, emit, id, actionId, note, signal),
     inspect: (id) => ({
       session: store.get(id),
       actions: store.list("actions", id),

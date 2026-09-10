@@ -28,9 +28,21 @@ export interface NexusAPI {
   prompt(id: string, text: string, delivery?: Input["delivery"], messageId?: string): Input
   sessions(): AgentSession[]
   diff(id: string): {
-    patches: { actionId?: string; patch: string }[]
+    patches: {
+      actionId?: string
+      path: string
+      patch: string
+      before: string
+      after: string
+      timestamp: number
+      beforeHash?: string
+      afterHash?: string
+      created: boolean
+      snapshotIntegrity: "verified" | "unavailable"
+    }[]
     processes: { actionId: string; tool: string; status: string; attribution: string }[]
   }
+  rollback(id: string, actionId: string, note: string, signal?: AbortSignal): Promise<Action>
   inspect(id: string): {
     session: AgentSession
     actions: Action[]

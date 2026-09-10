@@ -2,6 +2,7 @@ import type { AgentSession } from "../domain/types"
 import type { Store } from "../domain/ports"
 import { guard, hashFile } from "../tools/workspace"
 import { stat } from "node:fs/promises"
+import { bound, safeJson } from "../shared/redact"
 
 /** Inspect only. Never automatically replay an interrupted process, install or write. */
 export async function recover(session: AgentSession, store: Store) {
@@ -57,10 +58,20 @@ export async function recover(session: AgentSession, store: Store) {
     .flatMap((message) => message.toolCalls ?? [])
     .filter((call) => !settled.has(call.id))
     .forEach((call) => {
+      const action = store.list("actions", session.id).findLast((item) => item.callId === call.id)
       session.conversation.push({
         role: "tool",
         toolCallId: call.id,
-        content: "Previous execution was interrupted. Inspect durable ledger; this tool was not replayed.",
+        content: safeJson({
+          recovered: true,
+          actionId: action?.id,
+          status: action?.status ?? "NOT_EXECUTED",
+          evidenceIds: action?.evidenceIds ?? [],
+          error: action?.error,
+          result: action?.result === undefined ? undefined : bound(safeJson(action.result)),
+          recommendation:
+            "This call was not replayed. Inspect the recorded result; use output for the full action result. Request a new action only if still necessary.",
+        }),
       })
     })
   store.save(session)

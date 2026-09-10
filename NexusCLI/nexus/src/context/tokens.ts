@@ -1,5 +1,6 @@
 import type { TokenCounter } from "../domain/ports"
 import type { Message } from "../domain/types"
+import type { ToolSpec } from "../domain/ports"
 
 /**
  * Provider-independent token accounting.
@@ -39,11 +40,16 @@ export function countMessages(counter: TokenCounter, messages: Message[]) {
     (total, message) =>
       total +
       messageEnvelopeTokens +
-      counter.count(message.content) +
-      (message.toolCalls ?? []).reduce(
-        (sum, call) => sum + counter.count(call.name) + counter.count(JSON.stringify(call.arguments ?? null)),
-        0,
-      ),
+      counter.count(JSON.stringify({
+        role: message.role,
+        content: message.content,
+        ...(message.toolCalls?.length ? { tool_calls: message.toolCalls.map(call => ({ id: call.id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.arguments) } })) } : {}),
+        ...(message.toolCallId ? { tool_call_id: message.toolCallId } : {}),
+      })),
     0,
   )
+}
+
+export function countTools(counter: TokenCounter, tools: ToolSpec[]) {
+  return tools.length ? counter.count(JSON.stringify(tools.map(tool => ({ type: "function", function: tool })))) + 16 : 0
 }

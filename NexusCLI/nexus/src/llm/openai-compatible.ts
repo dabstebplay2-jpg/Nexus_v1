@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { ModelEvent, ModelRequest, Provider } from "../domain/ports"
-import { abort, cancellable, NexusError } from "../shared/errors"
+import { abort, cancellable, NexusError, isContextOverflow } from "../shared/errors"
 import { bound } from "../shared/redact"
 
 const deltaSchema = z.object({
@@ -116,7 +116,7 @@ export class OpenAICompatibleProvider implements Provider {
       if (response.ok) return response
       const raw = await responseText(response)
       const detail = bound(key ? raw.replaceAll(key, "[REDACTED]") : raw, 1000).text
-      if (response.status === 413 || /context.{0,30}(length|window|exceed|limit)|maximum context/i.test(detail))
+      if (response.status === 413 || isContextOverflow(detail))
         throw new NexusError("CONTEXT_OVERFLOW", detail)
       const retryable = response.status === 429 || response.status >= 500
       if (!retryable || attempt === 2) throw new NexusError(`HTTP_${response.status}`, detail, retryable)
