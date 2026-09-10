@@ -3,7 +3,8 @@ import { z } from "zod"
 import { defineTool, type Tool, type ToolContext } from "./registry"
 import { atomicWrite, files, guard, hashFile } from "./workspace"
 import { runProcess } from "./process"
-import { runShell, platformContext } from "./platform"
+import { platformContext } from "./platform"
+import { workspacePolicy } from "../sandbox/policy"
 import { commandCapabilities } from "../permissions/engine"
 import { NexusError, abort } from "../shared/errors"
 import { safeJson } from "../shared/redact"
@@ -169,7 +170,15 @@ export function builtinTools(): Tool[] {
       idempotency: "unsafe",
       permissions: (input) => commandCapabilities(input.command),
       execute: async (input, ctx) => {
-        const result = await runShell(input.command, ctx.session.workspace, ctx.signal)
+        const result = await ctx.sandbox.run({
+          argv: [input.command],
+          cwd: ctx.session.workspace,
+          shell: true,
+          signal: ctx.signal,
+          policy: workspacePolicy(ctx.session.workspace, commandCapabilities(input.command), {
+            timeoutMs: ctx.session.budgets.toolTimeoutMs,
+          }),
+        })
         return {
           output: result.stdout + result.stderr,
           kind: "COMMAND_RESULT",
@@ -177,6 +186,7 @@ export function builtinTools(): Tool[] {
           metadata: {
             command: input.command,
             shell: platformContext().shell,
+            sandbox: result.enforced,
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
@@ -222,7 +232,7 @@ export function builtinTools(): Tool[] {
         limit: z.number().int().min(1).max(12000).default(6000),
       }),
       execute: async (input, ctx) => {
-        const action = ctx.store.list("actions", ctx.session.id).find((item) => item.id === input.actionId)
+        const action = ctx.store.record("actions", ctx.session.id, input.actionId)
         if (!action) throw new NexusError("NOT_FOUND", "Unknown action")
         const output = safeJson(action.result)
         return {
@@ -234,7 +244,7 @@ export function builtinTools(): Tool[] {
   ]
 }
 function recordWriteIntent(ctx: ToolContext, beforeHash: string | null, after: string) {
-  const action = ctx.store.list("actions", ctx.session.id).find((item) => item.id === ctx.actionId)
+  const action = ctx.store.record("actions", ctx.session.id, ctx.actionId)
   if (!action) throw new NexusError("LEDGER", "Missing durable write intent")
   action.beforeHash = beforeHash ?? undefined
   action.afterHash = new Bun.CryptoHasher("sha256").update(after).digest("hex")

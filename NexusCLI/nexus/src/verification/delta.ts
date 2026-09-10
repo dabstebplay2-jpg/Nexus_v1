@@ -1,5 +1,5 @@
-import path from "node:path"
-import { files, hashFile } from "../tools/workspace"
+import { normalise } from "../workspace/paths"
+import { workspaceIndex } from "../workspace/index/fingerprint"
 import { runProcess } from "../tools/process"
 
 /**
@@ -12,8 +12,12 @@ import { runProcess } from "../tools/process"
  *   2. Paths a trusted check was previously observed to create are not source.
  *   3. Anything a check creates from nothing is not source; only mutating or deleting
  *      pre-existing content can invalidate a result.
+ *
+ * Content hashing is served by the incremental workspace index, so an unchanged file is proved
+ * unchanged from metadata instead of being re-read. `anchors` opts specific paths out of that
+ * optimization: trust anchors are always re-read so the proof chain never trusts `mtime`.
  */
-export type Inventory = { paths: Map<string, string>; git: boolean }
+export type Inventory = { paths: Map<string, string>; git: boolean; treeHash?: string; reads?: number }
 export type Delta = {
   created: string[]
   modified: string[]
@@ -25,8 +29,6 @@ export type Delta = {
   git: boolean
 }
 
-const normalise = (file: string) => file.split(path.sep).join("/")
-
 /** Tracked plus untracked-but-not-ignored paths. Git-ignored output never enters the source set. */
 async function gitSourcePaths(workspace: string) {
   const result = await runProcess(
@@ -35,7 +37,14 @@ async function gitSourcePaths(workspace: string) {
     AbortSignal.timeout(15000),
   ).catch(() => undefined)
   if (!result || result.exitCode !== 0) return undefined
-  return result.stdout.split("\0").filter(Boolean).map(normalise)
+  // Agent metadata is never project source. `files()` and the workspace guard already treat
+  // `.git` and `.nexus` as off-limits; without this the trust-manifest mirror would enter the
+  // fingerprint it exists to protect.
+  return result.stdout
+    .split("\0")
+    .filter(Boolean)
+    .map(normalise)
+    .filter((file) => !file.startsWith(".git/") && !file.startsWith(".nexus/"))
 }
 
 export function isGenerated(file: string, generated: readonly string[]) {
@@ -44,21 +53,21 @@ export function isGenerated(file: string, generated: readonly string[]) {
 }
 
 /** Snapshot the paths a check depends on, with content hashes. */
-export async function inventory(workspace: string, generated: readonly string[] = []): Promise<Inventory> {
+export async function inventory(
+  workspace: string,
+  generated: readonly string[] = [],
+  anchors: ReadonlySet<string> = new Set(),
+): Promise<Inventory> {
+  const index = workspaceIndex(workspace)
   const tracked = await gitSourcePaths(workspace)
-  const candidates = (tracked ?? (await files(workspace)).map(normalise)).filter(
-    (file) => !isGenerated(file, generated),
-  )
-  const entries = await Promise.all(
-    candidates.map(async (file) => {
-      const hash = await hashFile(path.join(workspace, file)).catch(() => undefined)
-      return hash === undefined ? undefined : ([file, hash] as const)
-    }),
-  )
-  return {
-    paths: new Map(entries.filter((entry): entry is [string, string] => entry !== undefined)),
-    git: tracked !== undefined,
-  }
+  // One universe per workspace keeps the index cache stable across calls that pass different
+  // generated-path lists. Generated output is filtered out of the result, exactly as before, so
+  // the fingerprint is unchanged; it is merely hashed once and then metadata-checked.
+  const snapshot = tracked ? await index.resolve(tracked, anchors) : await index.walk(anchors)
+  const paths = new Map<string, string>()
+  for (const file of snapshot.hashes.keys())
+    if (!isGenerated(file, generated)) paths.set(file, snapshot.hashes.get(file)!)
+  return { paths, git: tracked !== undefined, treeHash: snapshot.treeHash, reads: snapshot.stats.reads }
 }
 
 /** A stable identity for the source a decision was based on; generated output cannot stale it. */

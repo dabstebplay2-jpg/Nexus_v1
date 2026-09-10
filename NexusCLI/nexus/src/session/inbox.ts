@@ -13,7 +13,7 @@ export function admit(
   if (!text.trim() || text.length > 20000) throw new NexusError("INPUT", "Prompt must contain 1–20000 characters")
   return store.transaction(() => {
     store.get(sessionId)
-    const existing = store.list("queued_inputs", sessionId).find((input) => input.id === id)
+    const existing = store.record("queued_inputs", sessionId, id)
     if (existing) {
       if (existing.text !== redact(text) || existing.delivery !== delivery)
         throw new NexusError("INPUT_CONFLICT", "Conflicting prompt ID reuse")

@@ -10,6 +10,7 @@ import { ToolRegistry, defineTool } from "../src/tools/registry"
 import { builtinTools } from "../src/tools/builtin"
 import { ToolExecutor } from "../src/tools/executor"
 import { PermissionEngine } from "../src/permissions/engine"
+import { LocalSandboxProvider } from "../src/sandbox/local"
 import { guard, fingerprint, hashFile } from "../src/tools/workspace"
 import { bound, redact } from "../src/shared/redact"
 import { promote } from "../src/session/inbox"
@@ -141,7 +142,7 @@ test("atomic edits preserve user changes by rejecting stale hashes", async () =>
     try {
       const old = await hashFile(path.join(f.workspace, "add.ts"))
       await Bun.write(path.join(f.workspace, "add.ts"), "user changes")
-      const result = await new ToolExecutor(store, new PermissionEngine()).execute(
+      const result = await new ToolExecutor(store, new PermissionEngine(), new LocalSandboxProvider()).execute(
         session,
         "t",
         { id: "c", name: "write", arguments: { path: "add.ts", expectedHash: old, content: "agent changes" } },

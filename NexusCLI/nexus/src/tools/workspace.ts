@@ -1,26 +1,11 @@
 import path from "node:path"
-import { lstat, readdir, realpath, mkdir, rename, unlink, readFile } from "node:fs/promises"
+import { lstat, realpath, mkdir, rename, unlink, readFile } from "node:fs/promises"
 import { NexusError } from "../shared/errors"
+import { secretPath } from "../workspace/paths"
+import { walkPaths, maximumFiles } from "../workspace/index/scan"
+import { workspaceIndex } from "../workspace/index/fingerprint"
 
-const ignored = new Set([
-  ".git",
-  ".nexus",
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  ".venv",
-  "venv",
-  "__pycache__",
-  "target",
-  "bin",
-  "obj",
-])
-export function secretPath(file: string) {
-  return /(^|[\\/])(?:\.env(?:\..*)?|\.ssh|\.aws|\.npmrc|credentials[^\\/]*|id_rsa|id_ed25519)(?:$|[\\/])|\.(pem|p12|pfx|key)$/i.test(
-    file,
-  )
-}
+export { secretPath, ignoredDirectories } from "../workspace/paths"
 
 /** Reject traversal, junctions/symlinks, device paths, NTFS streams and protected metadata. */
 export async function guard(workspace: string, target: string, allowSecrets = false) {
@@ -45,36 +30,24 @@ export async function guard(workspace: string, target: string, allowSecrets = fa
   }
   return file
 }
-export async function files(workspace: string, maximum = 20000) {
-  const found: string[] = []
-  async function visit(directory: string) {
-    const entries = await readdir(path.join(workspace, directory), { withFileTypes: true })
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (entry.isSymbolicLink() || ignored.has(entry.name) || secretPath(entry.name)) continue
-      const relative = path.join(directory, entry.name)
-      if (entry.isDirectory()) {
-        await visit(relative)
-        continue
-      }
-      if (!entry.isFile()) continue
-      found.push(relative)
-      if (found.length > maximum)
-        throw new NexusError("PROJECT_LIMIT", `Project exceeds ${maximum} files; select a smaller project root`)
-    }
-  }
-  await visit("")
-  return found
+/**
+ * Project file paths in stable traversal order.
+ *
+ * The walk itself moved to `workspace/index/scan`, which collects metadata in the same pass so the
+ * incremental index can decide which files still need a content read. Ordering and exclusions are
+ * unchanged, because list/glob/search expose this order to the model.
+ */
+export async function files(workspace: string, maximum = maximumFiles) {
+  return (await walkPaths(workspace, maximum)).paths
 }
 export async function hashFile(file: string) {
   return new Bun.CryptoHasher("sha256").update(await readFile(file)).digest("hex")
 }
+/** Whole-workspace content identity, served from the incremental index. */
 export async function fingerprint(workspace: string) {
+  const snapshot = await workspaceIndex(workspace).walk()
   const hash = new Bun.CryptoHasher("sha256")
-  for (const file of await files(workspace)) {
-    if (Bun.file(path.join(workspace, file)).size > 32 * 1024 * 1024)
-      throw new NexusError("PROJECT_LIMIT", `File too large to verify: ${file}`)
-    hash.update(file).update(await hashFile(path.join(workspace, file)))
-  }
+  for (const file of snapshot.hashes.keys()) hash.update(file).update(snapshot.hashes.get(file)!)
   return hash.digest("hex")
 }
 export async function atomicWrite(file: string, text: string) {

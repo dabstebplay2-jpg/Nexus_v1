@@ -3,9 +3,9 @@ import type { AgentSession, VerificationRun } from "../domain/types"
 import type { Store } from "../domain/ports"
 import type { ToolExecutor } from "../tools/executor"
 import { defineTool } from "../tools/registry"
-import { runProcess } from "../tools/process"
+import { workspacePolicy } from "../sandbox/policy"
 import { abort, NexusError } from "../shared/errors"
-import { changedAssets } from "./integrity"
+import { alteredAnchors, explainTrust, trustViolations } from "./integrity"
 import { compare, inventory, inventoryFingerprint, isGenerated } from "./delta"
 
 /** Trusted check definitions are frozen at admission; model-created commands cannot mint verification evidence. */
@@ -39,7 +39,9 @@ export class VerificationEngine {
             item.verdict === "unknown" &&
             item.metadata.sourceChanged === true,
         )
-      const before = await inventory(session.workspace, generated)
+      // Trust anchors are always re-read from disk, never served from the index metadata cache.
+      const anchors = new Set(Object.keys(session.contract.trustManifest?.protected ?? session.contract.protectedFiles ?? {}))
+      const before = await inventory(session.workspace, generated, anchors)
       const baseline = inventoryFingerprint(before)
       run.fingerprint ||= baseline
       const learned: string[] = []
@@ -56,16 +58,22 @@ export class VerificationEngine {
           idempotency: "unsafe",
           permissions: ["RUN_TESTS"],
           execute: async (_, ctx) => {
-            const output = await runProcess(
-              check.argv,
-              session.workspace,
-              AbortSignal.any([ctx.signal, AbortSignal.timeout(check.timeoutMs)]),
-            )
-            const delta = compare(before, await inventory(session.workspace, generated), generated)
-            const alteredChecks = await changedAssets(session.workspace, session.contract.protectedFiles ?? {})
+            const output = await ctx.sandbox.run({
+              argv: check.argv,
+              cwd: session.workspace,
+              signal: ctx.signal,
+              policy: workspacePolicy(session.workspace, ["RUN_TESTS"], { timeoutMs: check.timeoutMs }),
+            })
+            const delta = compare(before, await inventory(session.workspace, generated, anchors), generated)
+            // One evaluation after the process covers tampering both before and during the run:
+            // hashes are compared against the revision's pinned values, not against the last run.
+            const violations = await trustViolations(session.workspace, session.contract)
+            const alteredChecks = alteredAnchors(violations)
             // Never learn a trust anchor as generated output.
-            learned.push(...delta.learned.filter((file) => !(session.contract.protectedFiles ?? {})[file]))
-            const unattributable = [...new Set([...delta.sourceChanges, ...alteredChecks])].sort()
+            learned.push(...delta.learned.filter((file) => !anchors.has(file)))
+            const unattributable = [
+              ...new Set([...delta.sourceChanges, ...violations.map((item) => item.path)]),
+            ].sort()
             const untrusted = quarantined || unattributable.length > 0
             return {
               output: output.stdout + output.stderr,
@@ -73,6 +81,7 @@ export class VerificationEngine {
               verdict: untrusted ? "unknown" : output.exitCode === 0 && (check.expectedStdout === undefined || output.stdout.trim() === check.expectedStdout.trim()) ? "pass" : "fail",
               metadata: {
                 argv: check.argv,
+                sandbox: output.enforced,
                 exitCode: output.exitCode,
                 stdout: output.stdout,
                 stderr: output.stderr,
@@ -81,11 +90,14 @@ export class VerificationEngine {
                 sourceChanged: unattributable.length > 0,
                 sourceChanges: unattributable,
                 alteredChecks,
+                trustViolations: violations,
                 quarantined,
                 generatedPaths: delta.learned,
                 ...(untrusted
                   ? {
-                      unknownReason: unattributable.length
+                      unknownReason: violations.length
+                        ? `The trust boundary moved: ${explainTrust(violations)}. A check cannot prove anything once its harness or build configuration has changed; review with trust-checks`
+                        : unattributable.length
                         ? `The check changed project source while running (${unattributable.join(", ")}), so its exit code cannot be attributed to the agent's work`
                         : "This check was already seen changing project source during this contract revision; review it with trust-checks before its result can count as proof",
                     }

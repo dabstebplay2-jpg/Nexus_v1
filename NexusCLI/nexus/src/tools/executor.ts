@@ -1,6 +1,7 @@
 import type { Store } from "../domain/ports"
 import type { Action, AgentSession, Evidence, ToolCall } from "../domain/types"
 import type { PermissionEngine } from "../permissions/engine"
+import type { SandboxProvider } from "../sandbox/ports"
 import type { Tool } from "./registry"
 import { abort, errorText, NexusError } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
@@ -9,6 +10,7 @@ export class ToolExecutor {
   constructor(
     private readonly store: Store,
     private readonly permissions: PermissionEngine,
+    private readonly sandbox: SandboxProvider,
   ) {}
   async execute(
     session: AgentSession,
@@ -70,6 +72,7 @@ export class ToolExecutor {
       const result = await tool.execute(input, {
         session,
         store: this.store,
+        sandbox: this.sandbox,
         signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(tool.timeout, session.budgets.toolTimeoutMs))]),
         actionId: action.id,
         waiting,
@@ -116,7 +119,7 @@ export class ToolExecutor {
         }),
       }
     } catch (error) {
-      const stored = this.store.list("actions", session.id).find((item) => item.id === action.id) ?? action
+      const stored = this.store.record("actions", session.id, action.id) ?? action
       const beforeMutation =
         error instanceof NexusError &&
         ["FILE_CONFLICT", "EDIT_MATCH", "BOUNDARY", "SECRET", "INPUT", "FILE_LIMIT", "PROCESS_START_FAILED"].includes(

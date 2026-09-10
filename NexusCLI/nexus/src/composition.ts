@@ -4,6 +4,7 @@ import { z } from "zod"
 import type { NexusAPI } from "./api"
 import type { AgentSession } from "./domain/types"
 import type { EventSink, PermissionReply, Provider, Store } from "./domain/ports"
+import type { SandboxProvider } from "./sandbox/ports"
 import { SqliteStore } from "./storage/sqlite"
 import { OpenAICompatibleProvider } from "./llm/openai-compatible"
 import { ContextManager } from "./context/manager"
@@ -18,12 +19,13 @@ import { gitBaseline } from "./git/baseline"
 import { agentChanges } from "./git/changes"
 import { rollback } from "./git/rollback"
 import { PermissionEngine, type Rules } from "./permissions/engine"
+import { LocalSandboxProvider } from "./sandbox/local"
 import { ToolRegistry, defineTool } from "./tools/registry"
 import { builtinTools } from "./tools/builtin"
 import { ToolExecutor } from "./tools/executor"
 import { VerificationEngine } from "./verification/engine"
 import { inventory, inventoryFingerprint } from "./verification/delta"
-import { verificationAssets } from "./verification/integrity"
+import { establishTrust } from "./verification/integrity"
 import { planSchema, revisePlan } from "./planner/plan"
 import { NexusError } from "./shared/errors"
 import { redact } from "./shared/redact"
@@ -34,13 +36,17 @@ export async function createNexus(options: {
   provider?: Provider
   store?: Store
   rules?: Rules
+  sandbox?: SandboxProvider
   permission?: PermissionReply
   onEvent?: EventSink
 }): Promise<NexusAPI> {
   await mkdir(options.dataDir, { recursive: true })
   const store = options.store ?? new SqliteStore(path.join(options.dataDir, "nexus.db"))
   const emit: EventSink = options.onEvent ?? (() => {})
-  const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission))
+  // The only execution backend Phase 0 ships. It reports honestly that it isolates nothing;
+  // a container or job-object provider can replace it here alone.
+  const sandbox = options.sandbox ?? new LocalSandboxProvider()
+  const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission), sandbox)
   const verification = new VerificationEngine(store, executor)
   const registry = new ToolRegistry()
   builtinTools().forEach((tool) => registry.register(tool))
@@ -111,10 +117,12 @@ export async function createNexus(options: {
       const project = await detect(workspace)
       const goalCheck = input.goalCheck ?? (input.mode === "answer" ? undefined : await inferGoalCheck(workspace, input.goal))
       const contract = createContract(redact(input.goal), project, input.mode ?? "coding", goalCheck)
-      contract.protectedFiles = await verificationAssets(
+      contract.trustManifest = await establishTrust(
         workspace,
         contract.checks.map((check) => check.argv),
+        contract.revision,
       )
+      contract.protectedFiles = contract.trustManifest.protected
       contract.generatedPaths = []
       contract.baselineFingerprint = inventoryFingerprint(await inventory(workspace))
       const session: AgentSession = {
@@ -198,7 +206,7 @@ export async function createNexus(options: {
       const session = store.get(id)
       const release = store.acquire(id, session.workspace)
       try {
-        const action = store.list("actions", id).find((item) => item.id === actionId)
+        const action = store.record("actions", id, actionId)
         if (!action || action.status !== "UNKNOWN" || !note.trim())
           throw new NexusError("RECOVERY", "An UNKNOWN action and inspection note are required")
         store.put("actions", {
@@ -217,11 +225,14 @@ export async function createNexus(options: {
       const release = store.acquire(id, session.workspace)
       try {
         if (!note.trim()) throw new NexusError("INPUT", "A review note is required")
-        session.contract.protectedFiles = await verificationAssets(
+        // A human reviewed the harness, so the boundary is re-established at the new revision.
+        session.contract.revision++
+        session.contract.trustManifest = await establishTrust(
           session.workspace,
           session.contract.checks.map((check) => check.argv),
+          session.contract.revision,
         )
-        session.contract.revision++
+        session.contract.protectedFiles = session.contract.trustManifest.protected
         store.save(session)
         publish(store, session, emit, "trust_checks", { note: redact(note) })
       } finally {

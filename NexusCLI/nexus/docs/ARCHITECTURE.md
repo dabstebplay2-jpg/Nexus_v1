@@ -26,13 +26,21 @@
 
 Domain содержит данные и Store/Provider/Event/Permission порты. AgentLoop получает collaborators через конструктор. SQLite и HTTP создаются только в `composition.ts`. CLI вызывает `NexusAPI`; визуальное отображение не участвует в CompletionPolicy. Ни одного runtime import из OpenCode нет.
 
+Исполнение процессов проходит через порт `SandboxProvider` (`src/sandbox/ports.ts`) с `ExecutionPolicy`, `NetworkPolicy` и `PathScope`. Реализация по умолчанию — `LocalSandboxProvider`, и она честно объявляет отсутствие изоляции; результат каждого запуска несёт `enforced`, который попадает в metadata доказательства. Контейнерный backend подключается как аргумент конструктора, без изменений вызывающего кода.
+
+Инкрементальный индекс workspace (`src/workspace/index/`) отделён от инструментов: `cache.ts` хранит метаданные файлов, `merkle.ts` — дерево с локальной инвалидацией, `fingerprint.ts` собирает снимок. Алгоритм completion fingerprint не изменился побайтово, потому что fingerprint — это идентичность доказательства: смена алгоритма обесценила бы всё ранее записанное evidence. Merkle root — дополнительные метаданные, а не идентичность.
+
 Ledger и Evidence — отдельные типизированные записи с собственными таблицами; хранение реализует общий Store, чтобы транзакции объединяли изменения разных проекций. Не созданы пустые workspace packages ради количества директорий. Boundaries проверяются скриптом.
 
 ## Долговечность
 
-SQLite: WAL, synchronous FULL, foreign keys, busy timeout, schema version через user_version. Таблицы: sessions, messages, turns, plans, plan_steps, actions, tool_calls, evidence, verification_runs, context_epochs, queued_inputs, events, owners. Типизированные JSON payloads позволяют развивать поля; relational session_id/seq и индексы обеспечивают принадлежность и порядок.
+SQLite: WAL, synchronous FULL, foreign keys, busy timeout, schema version через user_version. Schema v2: sessions (только header, без транскрипта), session_messages (позиционный транскрипт, WITHOUT ROWID), session_events (append-only ledger с монотонным seq), turns, plans, plan_steps, actions, tool_calls, evidence, verification_runs, context_epochs, queued_inputs, events, owners. Типизированные JSON payloads позволяют развивать поля; relational session_id/seq и индексы обеспечивают принадлежность и порядок. Миграция v1 -> v2 переносит conversation из session blob в session_messages внутри одной immediate transaction и только после этого удаляет избыточную таблицу messages.
 
-Session JSON — основная атомарная проекция; messages/plans/plan_steps — диагностические проекции. Optimistic version защищает от потерянных обновлений. При коллизии ID между сессиями запись отклоняется. Admission и promotion используют SQLite transaction.
+Транскрипт дописывается, а не перезаписывается: `save()` сравнивает длину с сохранённой и проверяет граничное сообщение, и при несовпадении честно откатывается к полной перезаписи. Каждая запись добавляет конверт в session_events — только ссылку, без копии payload, — поэтому `seq` работает как долговечный курсор для timeline. Типизированные таблицы являются проекциями последнего состояния записи.
+
+Session header — основная атомарная проекция; plans/plan_steps — диагностические проекции. Optimistic version защищает от потерянных обновлений. При коллизии ID между сессиями запись отклоняется. Admission и promotion используют SQLite transaction.
+
+Чтение ограничено по стоимости: `header`, `record`, `count`, `page`, `tail` и `ledger` не загружают сессию целиком. Полное `list` сохранено намеренно — CompletionPolicy обязана оценивать всё доказательство и все действия перед авторизацией COMPLETE, и подмена этого выборкой означала бы, что авторизатор рассуждает о части записи.
 
 Владелец — PID + случайный token в SQLite. Живой процесс блокирует вторую сессию того же workspace. Освобождать блокировку может только владелец token. Отдельные процессы не продолжают работу автоматически после падения. PID reuse приводит к консервативной блокировке, не к конкурентному запуску.
 
