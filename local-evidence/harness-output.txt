@@ -1,0 +1,25 @@
+✔ scenario 1: an explicit refusal to change files produces a read-only analysis intent (3.104987ms)
+✔ scenario 1: read-only intents offer reads and refuse mutation and shell (0.538329ms)
+✔ scenario 2: repair work stays mutating and verified (0.186625ms)
+✔ workflow per task type (0.490034ms)
+✔ a request that demands change outranks read-only vocabulary (0.33804ms)
+✔ an explicit coding mode overrides the read-only restriction (0.237948ms)
+✔ v0.2.2 behaviour is preserved for every goal used by the existing suite (0.299837ms)
+✔ sessions without an intent keep the v0.2.2 tool surface (0.123468ms)
+✔ error memory counts failures per signature and recommends an escalation (0.570302ms)
+✔ a success clears its signature, and distinct arguments are tracked apart (0.332503ms)
+✔ scenario 3: the supervisor changes strategy at 3 and stops at 5 (0.286084ms)
+✔ the supervisor never weakens the loop guard (0.217117ms)
+✔ trust profiles resolve a pinned command without asking (0.317145ms)
+✔ patterns are literal with an optional trailing wildcard, and later rules win (0.148728ms)
+✔ no rule and no level can grant a NEVER_AUTOMATIC capability (0.188799ms)
+✔ profile documents are validated structurally (0.186657ms)
+✔ the resolved intent is assignable to the domain type (0.120545ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 132.313562
