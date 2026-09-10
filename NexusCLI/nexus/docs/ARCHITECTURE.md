@@ -47,3 +47,19 @@ Session header — основная атомарная проекция; plans/p
 ## Отличие от fork
 
 CompletionPolicy, evidence freshness, защита test harness, UNKNOWN recovery и LoopGuard — самостоятельная реализация. Код OpenCode не копировался; переносились архитектурные идеи. Attribution и исходный MIT notice сохранены в THIRD_PARTY_NOTICES.md.
+
+## Context Engine
+
+Контекст собирается только в `ContextManager.build()`; второго пути к prompt нет. Приоритет объявлен явно: L0 critical (instructions, security framing, environment, routing и planning guidance, contract, tool schemas, AGENTS.md), L1 active working context (message groups текущей эпохи), L2 task memory (`taskMemory()` — детерминированный JSON из storage, а не текст модели), L3 project memory (`ProjectKnowledge`), L4 archive. L4 никогда не отправляется модели и доступен только через инструменты `history` и `output`.
+
+Аллокация (`src/context/layers.ts`): pinned блоки допускаются первыми, оставшееся распределяется по слоям долями, зависящими от стадии compaction (soft 0.70, hard 0.85, emergency 0.95 от допустимого лимита — `budgetUtilisation`, а не от окна: `contextUtilisation` по построению не превышает 0.9, поэтому emergency на оконной шкале был бы недостижим). Блок, не поместившийся в долю своего слоя, исключается целиком, а не обрезается; нехватка места под pinned контекст возвращается как `overflow`, а не скрывается. Working floor 0.35 не участвует в аллокации знаний: prompt, который поместился только потому, что project knowledge вытеснил текущий результат инструмента, — не меньший prompt, а слепой.
+
+Стадия вычисляется после compaction эпохи, поэтому только что сжатая сессия снова рендерится в полной детализации. Сама эпоха не изменилась: `compact()` двигает `epochStart`, пишет строку в context_epochs и эмитит `context_compressed`. Compaction переводит историю в L4, но не удаляет её.
+
+Evidence не зависит от summary: CompletionPolicy читает доказательства из storage. Compaction может потерять recall модели, но не может создать, обновить или подделать доказательство. Ни один новый компонент не авторизует COMPLETED.
+
+Project Intelligence (`src/project/knowledge.ts`) построен на существующем инкрементальном обходе `src/workspace/index/scan.ts`; второго обхода файловой системы и второго кэша нет. Свежесть — короткий TTL плюс signature по path/size/mtime, поэтому повторный обход стоит только метаданных. Недоступный workspace даёт `partial` запись, а не исключение: оптимизация не имеет права ронять run. Запись попадает в prompt через порт `ContextSource`, который существовал, но не имел реализаций.
+
+Tool Router (`src/tools/router.ts`) — guidance и классификация, а не state machine: он ничего не блокирует и не отменяет permission engine. `shellRedirect` предлагает guarded эквивалент (`cat` -> `read`, `ls` -> `list`, `grep`/`rg` -> `search`, `find` -> `glob`, test runner -> `verify`) и намеренно молчит при redirection, command substitution, неизвестных и разрушительных командах: неверный redirect хуже отсутствующего.
+
+Наблюдаемость — `ContextReport` и событие `context_report` на каждый собранный turn: окно, лимит, reserved output, использованные токены, стадия, detail scale, токены по категориям со слоем и долей, included/excluded ключи, счётчики истории и before/after compaction. Отчёт содержит только имена категорий и числа, без содержимого файлов, команд и секретов. Подробности — `NEXUS_CONTEXT_ARCHITECTURE.md`.
