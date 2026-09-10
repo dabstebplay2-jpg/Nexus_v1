@@ -6,6 +6,8 @@ import type { ToolExecutor } from "../tools/executor"
 import type { VerificationEngine } from "../verification/engine"
 import { completionPolicy } from "../completion/policy"
 import { loopGuard } from "../loop-guard/policy"
+import { toolAllowed } from "../intelligence/intent"
+import { supervise } from "../intelligence/supervisor"
 import { promote } from "../session/inbox"
 import { recover } from "../recovery/policy"
 import { inventory, inventoryFingerprint } from "../verification/delta"
@@ -109,23 +111,36 @@ export class AgentLoop {
         abort(deadline)
         session.activeMs = elapsed + Date.now() - started
         promote(this.deps.store, session, "STEER")
-        const guard = loopGuard(session, this.deps.store.list("actions", id), this.deps.store.list("evidence", id))
-        if (guard) {
-          publish(this.deps.store, session, this.deps.emit, "loop_guard", guard)
-          if (guard.action === "STOP") {
-            session.decision = { outcome: "BLOCKED", reason: guard.reason, missing: [] }
-            move("FAILED", guard.reason)
+        const actions = this.deps.store.list("actions", id)
+        const evidence = this.deps.store.list("evidence", id)
+        const guard = loopGuard(session, actions, evidence)
+        if (guard) publish(this.deps.store, session, this.deps.emit, "loop_guard", guard)
+        const decision = supervise({ session, actions, evidence, guard })
+        if (decision) {
+          publish(this.deps.store, session, this.deps.emit, "supervisor", {
+            action: decision.action,
+            reason: decision.reason,
+            source: decision.source,
+          })
+          if (decision.action === "STOP" || decision.action === "REQUEST_USER_INPUT") {
+            session.decision = {
+              outcome: decision.action === "STOP" ? "BLOCKED" : "NEEDS_USER_INPUT",
+              reason: decision.reason,
+              missing: [],
+            }
+            move("FAILED", decision.reason)
             break
           }
-          if (guard.action === "COMPACT_CONTEXT") this.deps.context.compact(session)
+          // Error guidance may take precedence, but must not suppress requested compaction.
+          if (guard?.action === "COMPACT_CONTEXT") this.deps.context.compact(session)
           session.conversation.push({
             role: "system",
-            content: `${guard.action}: ${guard.reason}. Choose a different action; do not repeat the loop.`,
+            content: decision.guidance,
           })
         }
         move("ACTING")
         const snapshot = this.deps.registry.capture()
-        const specs = session.contract.mode === "answer" ? [] : snapshot.specs
+        const specs = snapshot.specs.filter((spec) => toolAllowed(session.intent, spec.name, session.contract.mode))
         const specTokens = this.deps.context.toolTokens(specs)
         const messages = await this.deps.context.build(session, specTokens)
         const turn: Turn = {
@@ -178,7 +193,7 @@ export class AgentLoop {
           )
           if (calls.some((call) => priorIds.has(call.id)))
             throw new NexusError("PROTOCOL", "Tool call ID was already used in an earlier turn")
-          if (calls.length && (session.contract.mode === "answer" || !session.model.capabilities.toolCalling))
+          if (calls.length && (!specs.length || !session.model.capabilities.toolCalling))
             throw new NexusError("CAPABILITY", "Tools are unavailable in this mode/model")
           turn.status = "SUCCEEDED"
           transientRetries = 0

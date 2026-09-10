@@ -3,6 +3,7 @@ import type { Action, AgentSession, Evidence, ToolCall } from "../domain/types"
 import type { PermissionEngine } from "../permissions/engine"
 import type { SandboxProvider } from "../sandbox/ports"
 import type { Tool } from "./registry"
+import { toolAllowed } from "../intelligence/intent"
 import { abort, errorText, NexusError } from "../shared/errors"
 import { bound, redact, safeJson } from "../shared/redact"
 
@@ -48,6 +49,11 @@ export class ToolExecutor {
     this.store.save(session)
     try {
       abort(signal)
+      if (!toolAllowed(session.intent, tool.name, session.contract.mode))
+        throw new NexusError(
+          "BOUNDARY",
+          `Tool ${tool.name} is unavailable: this task is classified ${session.intent?.type ?? "UNKNOWN"} and runs read-only. Allowed tools: ${(session.intent?.allowedTools ?? []).join(", ")}. Use one of those, or answer with what you already have.`,
+        )
       const input = tool.inputSchema.parse(call.arguments)
       const capabilities = tool.permissions(input)
       if (capabilities.length && capabilities.every((capability) => capability === "READ")) {
@@ -58,6 +64,7 @@ export class ToolExecutor {
       await this.permissions.authorize(
         {
           sessionId: session.id,
+          workspace: session.workspace,
           actionId: action.id,
           tool: tool.name,
           arguments: action.arguments,

@@ -147,6 +147,12 @@ export type DiffResponse = {
   processes: { actionId: string; tool: string; status: string; attribution: string }[]
 }
 export type ErrorResponse = { error: string; code?: string }
+export type WorkspaceDirectory = {
+  path: string
+  entries: { name: string; path: string; kind: "file" | "directory" }[]
+  truncated: boolean
+}
+export type WorkspaceFile = { path: string; content: string }
 export type ReportPlanStep = {
   id: string
   description: string

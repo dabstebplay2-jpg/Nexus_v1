@@ -9,6 +9,7 @@ import { diagnoseModel } from "./models"
 import { ProjectRegistry } from "../shared/projects"
 import type { CheckSummary, ProjectDetail, ProjectTask } from "../shared/protocol"
 import { RunManager } from "./runs"
+import { workspaceDirectory, workspaceFile } from "./workspace"
 
 /**
  * The API layer: Frontend -> API Server -> Nexus Core -> Agent Loop.
@@ -71,6 +72,9 @@ const status: Record<string, number> = {
   PERMISSION_REQUIRED: 403,
   STATE: 409,
   ABORTED: 499,
+  BOUNDARY: 403,
+  SECRET: 403,
+  FILE_LIMIT: 400,
 }
 /** Only loopback origins, so a page the user happens to visit cannot start runs on their machine. */
 const allowedOrigin = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/
@@ -240,6 +244,11 @@ export function createRouter(deps: ServerDeps) {
         const project = await deps.registry.add(input, defaultSettings(deps.template))
         return json(await projectDetail(project.id), headers, 201)
       }
+    }
+    if (parts.length === 4 && parts[1] === "projects" && method === "GET") {
+      const project = await deps.registry.get(parts[2]!)
+      if (parts[3] === "files") return json(await workspaceDirectory(project.path, url.searchParams.get("path") ?? "."), headers)
+      if (parts[3] === "file") return json(await workspaceFile(project.path, url.searchParams.get("path") ?? ""), headers)
     }
     if (parts.length === 3 && parts[1] === "projects") {
       const id = parts[2]!

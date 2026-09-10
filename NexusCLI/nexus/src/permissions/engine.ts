@@ -1,18 +1,21 @@
+import path from "node:path"
 import type { Capability } from "../domain/types"
 import type { PermissionReply, PermissionRequest } from "../domain/ports"
 import { NexusError, cancellable } from "../shared/errors"
 import { safeJson } from "../shared/redact"
+import { levelRules, matchPermission, type TrustProfile } from "../intelligence/trust"
 
 export type Rules = Partial<Record<Capability, "allow" | "ask" | "deny">>
 export class PermissionEngine {
   constructor(
     private readonly rules: Rules = {},
     private readonly reply?: PermissionReply,
+    private readonly trust?: TrustProfile,
   ) {}
-  evaluate(capabilities: Capability[]) {
+  evaluate(capabilities: Capability[], rules: Rules = this.rules) {
     const decisions = capabilities.map(
       (capability) =>
-        this.rules[capability] ??
+        rules[capability] ??
         (
           {
             READ: "allow",
@@ -29,7 +32,21 @@ export class PermissionEngine {
     return decisions.includes("deny") ? "deny" : decisions.includes("ask") ? "ask" : "allow"
   }
   async authorize(request: PermissionRequest, signal: AbortSignal, waiting: () => void) {
-    const decision = this.evaluate(request.capabilities)
+    // Scope both level defaults and command rules; one API can run several workspaces.
+    const trust =
+      this.trust && request.workspace && path.relative(this.trust.workspace, request.workspace) === ""
+        ? this.trust
+        : undefined
+    const baseline = this.evaluate(request.capabilities, { ...(trust ? levelRules(trust.level) : {}), ...this.rules })
+    const trusted = matchPermission(trust, {
+      action: request.tool,
+      command:
+        typeof request.arguments === "object" && request.arguments && "command" in request.arguments
+          ? String(request.arguments.command)
+          : undefined,
+      capabilities: request.capabilities,
+    })
+    const decision = baseline === "deny" || trusted?.permission === "deny" ? "deny" : (trusted?.permission ?? baseline)
     const operation = `${request.tool} ${safeJson(request.arguments)} [${request.capabilities.join(", ")}]`
     if (decision === "deny")
       throw new NexusError(

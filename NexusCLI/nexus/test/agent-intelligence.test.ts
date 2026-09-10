@@ -62,18 +62,26 @@ test("an analysis request reads the project without shell, verification or mutat
   expect(inspected.evidence.some((item) => item.source === "verification")).toBe(false)
   expect(await Bun.file(path.join(harness.workspace, "add.ts")).text()).toBe(brokenAdd)
   expect(inspected.session.status).toBe("COMPLETED")
+  for (const request of harness.provider.requests)
+    expect(request.tools.map((tool) => tool.name).sort()).toEqual([...READ_ONLY_TOOLS].sort())
   await harness.cleanup()
 })
 
 // Scenario 2 -- "Найди ошибку. Исправь. Докажи."
 test("a repair request keeps the coding contract, the shell and the evidence requirement", async () => {
-  const harness = await fixtureWith(tree, (_request, turn) =>
-    turn === 1
-      ? call("write", { path: "add.ts", content: "export const add = (a: number, b: number) => a + b\n" })
-      : turn === 2
-        ? call("verify", {})
-        : answer("Reproduced the failure, fixed the operator and the goal scenario now passes."),
-  )
+  const harness = await fixtureWith(tree, (request, turn) => {
+    if (turn === 1) return call("read", { path: "add.ts" })
+    if (turn === 2) {
+      const read = JSON.parse(request.messages.findLast((message) => message.role === "tool")!.content)
+      return call("write", {
+        path: "add.ts",
+        content: "export const add = (a: number, b: number) => a + b\n",
+        expectedHash: JSON.parse(read.metadata).hash,
+      })
+    }
+    if (turn === 3) return call("verify", {})
+    return answer("Fixed the operator and the goal scenario now passes.")
+  })
   const session = await harness.api.create({
     workspace: harness.workspace,
     goal: "Найди ошибку. Исправь. Докажи.",
@@ -91,6 +99,7 @@ test("a repair request keeps the coding contract, the shell and the evidence req
   expect(inspected.actions.some((action) => action.tool === "write" && action.status === "SUCCEEDED")).toBe(true)
   expect(inspected.evidence.some((item) => item.source === "verification")).toBe(true)
   expect(await Bun.file(path.join(harness.workspace, "add.ts")).text()).toContain("a + b")
+  expect(inspected.session.status).toBe("COMPLETED")
   await harness.cleanup()
 })
 
@@ -112,6 +121,13 @@ test("a command that keeps failing stops the run instead of burning the budget",
   expect(inspected.session.status).toBe("FAILED")
   expect(inspected.session.toolCount).toBeLessThan(session.budgets.maxTools)
   expect(inspected.events.some((event) => event.type === "supervisor")).toBe(true)
+  expect(inspected.session.decision?.outcome).toBe("NEEDS_USER_INPUT")
+  expect(inspected.events).toContainEqual(
+    expect.objectContaining({
+      type: "supervisor",
+      data: expect.objectContaining({ action: "CHANGE_STRATEGY", source: "error-memory" }),
+    }),
+  )
   await harness.cleanup()
 })
 
@@ -138,7 +154,8 @@ test("the read-only surface is exactly list, read, search, history and output", 
   expect(mode).toBe("answer")
   expect(READ_ONLY_TOOLS).toEqual(["list", "glob", "search", "read", "retrieve", "history", "output"])
   for (const tool of ["list", "read", "search", "history", "output"]) expect(toolAllowed(intent, tool, mode)).toBe(true)
-  for (const tool of ["write", "edit", "bash", "verify", "git_status"]) expect(toolAllowed(intent, tool, mode)).toBe(false)
+  for (const tool of ["write", "edit", "bash", "verify", "git_status"])
+    expect(toolAllowed(intent, tool, mode)).toBe(false)
   // Sessions created before v0.2.3 carry no intent and keep the previous surface.
   expect(toolAllowed(undefined, "bash", "coding")).toBe(true)
   expect(toolAllowed(undefined, "bash", "answer")).toBe(false)
@@ -191,15 +208,15 @@ test("trust profiles pin a command without weakening the safety floor", () => {
   expect(matchPermission(profile, { action: "write", command: "bun test", capabilities })).toBeUndefined()
   // No rule and no level may grant an escalation capability.
   for (const capability of NEVER_AUTOMATIC) {
-    expect(matchPermission(profile, { action: "bash", command: "bun test", capabilities: [capability] })?.permission).toBe(
-      "ask",
-    )
+    expect(
+      matchPermission(profile, { action: "bash", command: "bun test", capabilities: [capability] })?.permission,
+    ).toBe("ask")
     expect(levelRules("autonomous")[capability]).toBeUndefined()
   }
   expect(levelRules("normal")).toEqual({})
   expect(parseTrustProfile({ level: "godmode", rules: [] }, "/w")).toBeUndefined()
   expect(parseTrustProfile({ level: "safe", rules: [{ action: "bash" }] }, "/w")).toBeUndefined()
-  expect(parseTrustProfile({ level: "safe", rules: [{ action: "bash", permission: "allow" }] }, "/w")?.rules).toHaveLength(
-    1,
-  )
+  expect(
+    parseTrustProfile({ level: "safe", rules: [{ action: "bash", permission: "allow" }] }, "/w")?.rules,
+  ).toHaveLength(1)
 })

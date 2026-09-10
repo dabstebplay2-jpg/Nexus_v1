@@ -52,6 +52,7 @@ export interface Provider {
 }
 export type PermissionRequest = {
   sessionId: string
+  workspace?: string
   actionId: string
   tool: string
   arguments: unknown

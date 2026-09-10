@@ -74,8 +74,8 @@ textarea:focus {
   outline: 1px solid var(--accent-hover);
 }
 .app {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 .topbar {
@@ -114,11 +114,7 @@ textarea:focus {
 .spacer {
   flex: 1;
 }
-.columns {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1.1fr);
-  min-height: 0;
-}
+.permission-notice { color: var(--unknown); border-color: var(--unknown); }
 .pane {
   display: flex;
   flex-direction: column;

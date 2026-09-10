@@ -40,13 +40,14 @@ export function ExecutionView(props: {
   onTrustChecks: (note: string) => void
   onAssertGoal: (note: string) => void
   onResume: () => void
+  view?: "plan" | "changes" | "evidence"
 }) {
   const [note, setNote] = useState("")
   const report = props.report
   return (
     <section className="pane">
       <header>
-        Execution
+        {props.view === "plan" ? "Plan" : props.view === "changes" ? "Changes / Diff" : props.view === "evidence" ? "Evidence" : "Execution"}
         <span className="spacer" />
         {report && <span className="muted">{report.sessionId.slice(0, 8)}</span>}
       </header>
@@ -54,7 +55,7 @@ export function ExecutionView(props: {
         {!report && <p className="muted">Run a task to see the plan, the changes, the checks and the evidence.</p>}
         {report && (
           <>
-            <div className="section">
+            {(!props.view || props.view === "plan") && <div className="section">
               <h3>Plan</h3>
               {report.plan.length === 0 ? (
                 <p className="muted">No explicit plan was recorded.</p>
@@ -72,9 +73,9 @@ export function ExecutionView(props: {
                   </div>
                 ))
               )}
-            </div>
+            </div>}
 
-            <div className="section">
+            {(!props.view || props.view === "changes") && <div className="section">
               <h3>Changes</h3>
               {report.changes.files.length === 0 && report.changes.processes.length === 0 ? (
                 <p className="muted">No file changes were recorded.</p>
@@ -102,9 +103,9 @@ export function ExecutionView(props: {
                   ))}
                 </>
               )}
-            </div>
+            </div>}
 
-            <div className="section">
+            {(!props.view || props.view === "evidence") && <div className="section">
               <h3>Verification</h3>
               {report.verification.length === 0 ? (
                 <p className="muted">No trusted check has been run.</p>
@@ -132,18 +133,18 @@ export function ExecutionView(props: {
                   </div>
                 ))
               )}
-            </div>
+            </div>}
 
-            <div className="section">
+            {(!props.view || props.view === "evidence") && <div className="section">
               <h3>Evidence</h3>
               {report.evidence.length === 0 ? (
                 <p className="muted">The contract has no required criteria.</p>
               ) : (
                 report.evidence.map((criterion) => <Criterion key={criterion.id} criterion={criterion} />)
               )}
-            </div>
+            </div>}
 
-            <div className="section">
+            {!props.view && <div className="section">
               <h3>Result</h3>
               <div className="mono">
                 {report.status === "COMPLETED" && (
@@ -166,9 +167,9 @@ export function ExecutionView(props: {
                   <div className="mono">{report.proposal.text}</div>
                 </div>
               )}
-            </div>
+            </div>}
 
-            {report.affordances.length > 0 && (
+            {!props.view && report.affordances.length > 0 && (
               <div className="section">
                 <h3>Next steps</h3>
                 <input
