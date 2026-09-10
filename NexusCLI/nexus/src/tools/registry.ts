@@ -1,11 +1,14 @@
 import { z } from "zod"
 import type { AgentSession, Capability, EvidenceKind, Risk, Verdict } from "../domain/types"
 import type { Store, ToolSpec } from "../domain/ports"
+import type { SandboxProvider } from "../sandbox/ports"
 import { NexusError } from "../shared/errors"
 
 export type ToolContext = {
   session: AgentSession
   store: Store
+  /** Every process launch goes through here, so isolation can be added behind one port. */
+  sandbox: SandboxProvider
   signal: AbortSignal
   actionId: string
   waiting: () => void

@@ -53,12 +53,14 @@ export async function recover(session: AgentSession, store: Store) {
   const settled = new Set(
     session.conversation.filter((message) => message.role === "tool").map((message) => message.toolCallId),
   )
+  // One scan, indexed by call id: the previous code re-listed every action per unsettled call.
+  const byCall = new Map(store.list("actions", session.id).map((item) => [item.callId, item]))
   session.conversation
     .filter((message) => message.role === "assistant")
     .flatMap((message) => message.toolCalls ?? [])
     .filter((call) => !settled.has(call.id))
     .forEach((call) => {
-      const action = store.list("actions", session.id).findLast((item) => item.callId === call.id)
+      const action = byCall.get(call.id)
       session.conversation.push({
         role: "tool",
         toolCallId: call.id,

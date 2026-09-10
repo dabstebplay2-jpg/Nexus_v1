@@ -89,6 +89,29 @@ export type Criterion = {
   expectedVerdict?: Verdict
   baseline?: boolean
 }
+/**
+ * Trust anchors, pinned.
+ *
+ * Two pattern classes, because they need opposite rules. Harness and configuration files decide
+ * *how* a check runs, so introducing one that did not exist is as dangerous as editing one.
+ * Existing test cases must not be edited under a check, but adding new regression tests is the
+ * work being asked for, so a new file matching an `extensible` pattern is not a violation.
+ */
+export type TrustPatterns = { exclusive: string[]; extensible: string[] }
+export type TrustManifest = {
+  version: number
+  generatedAt: string
+  contractRevision: number
+  patterns: TrustPatterns
+  /** Anchor path -> sha256 at the moment trust was established. */
+  protected: Record<string, string>
+  /** Well-known harness files absent when trust was established. Informational; the guard derives its own. */
+  absent: string[]
+  /** Files named directly by a trusted check's argv. */
+  runners: string[]
+}
+export type TrustViolationKind = "modified" | "deleted" | "introduced"
+export type TrustViolation = { path: string; kind: TrustViolationKind; reason: string }
 export type Contract = {
   revision: number
   goal: string
@@ -99,6 +122,8 @@ export type Contract = {
   baselineFingerprint?: string
   /** Paths and directory prefixes a trusted check was observed to generate. Learned, never hardcoded. */
   generatedPaths?: string[]
+  /** Pinned trust anchors. Absent on sessions created before Phase 0; protectedFiles still applies. */
+  trustManifest?: TrustManifest
 }
 export type Project = { kind: string; packageManager?: string; roots: string[]; checks: Check[] }
 export type GitBaseline = {

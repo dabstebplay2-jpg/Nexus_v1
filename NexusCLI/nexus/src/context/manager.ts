@@ -67,7 +67,7 @@ export class ContextManager {
       for (const messages of candidates) {
         const inputTokens = this.tokens(messages) + toolTokens
         if (inputTokens > budget.limit) continue
-        const current = this.store.list("context_epochs", session.id).findLast(epoch => epoch.number === session.epoch)
+        const current = this.store.tail("context_epochs", session.id, 1, { path: "$.number", values: [String(session.epoch)] }).at(-1)
         session.summary = summary
         session.context = { pressure: budget.pressure, failures: session.context?.failures ?? 0, inputTokens, outputTokens: budget.output, mode }
         this.store.transaction(() => {
@@ -104,8 +104,8 @@ export class ContextManager {
   }
   private async instructions(session: AgentSession) {
     const candidates = new Set(["AGENTS.md"])
-    this.store.list("evidence", session.id)
-      .filter(item => item.kind === "FILE_ASSERTION" && typeof item.metadata.path === "string").slice(-4)
+    this.store.tail("evidence", session.id, 16, { path: "$.kind", values: ["FILE_ASSERTION"] })
+      .filter(item => typeof item.metadata.path === "string").slice(-4)
       .forEach(item => {
         const parts = path.dirname(path.relative(session.workspace, path.resolve(session.workspace, String(item.metadata.path)))).split(/[\\/]/).filter(part => part && part !== ".")
         parts.forEach((_, index) => candidates.add(path.join(...parts.slice(0, index + 1), "AGENTS.md")))

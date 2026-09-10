@@ -29,7 +29,7 @@ export async function rollback(store: Store, executor: ToolExecutor, emit: Event
       execute: async (_, ctx) => {
         const target = await guard(ctx.session.workspace, patch.path)
         if (await hashFile(target).catch(() => undefined) !== patch.afterHash) throw new NexusError("FILE_CONFLICT", "File changed while awaiting approval; rollback cancelled")
-        const action = store.list("actions", id).find(item => item.id === ctx.actionId)!
+        const action = store.record("actions", id, ctx.actionId)!
         action.beforeHash = patch.afterHash
         action.afterHash = patch.beforeHash
         store.put("actions", action)

@@ -18,10 +18,11 @@
     "typecheck": "tsc --noEmit",
     "build": "bun run script/build.ts",
     "bench": "bun run bench/run.ts",
+    "bench:phase0": "bun run bench/phase0.ts",
     "check:boundaries": "bun run script/boundaries.ts",
     "smoke": "bun run script/smoke.ts",
     "smoke:product": "bun run script/product-smoke.ts",
-    "format:check": "prettier --check src apps test script bench/run.ts bench/oracle.ts docs README.md"
+    "format:check": "prettier --check src apps test script bench/run.ts bench/oracle.ts bench/phase0.ts docs README.md"
   },
   "dependencies": {
     "diff": "8.0.2",
