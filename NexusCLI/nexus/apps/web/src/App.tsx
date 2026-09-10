@@ -14,14 +14,18 @@ import { ChatPanel } from "./components/ChatPanel"
 import { ExecutionView } from "./components/ExecutionView"
 import { ModelBar } from "./components/ModelBar"
 import { ProjectsPanel } from "./components/ProjectsPanel"
+import { DockLayout, useWorkspace } from "./components/workspace/DockLayout"
+import { AgentStatePanel, PermissionsPanel, TerminalPanel, TimelinePanel } from "./components/workspace/AgentPanels"
+import { EditorPanel, FileBrowser, useProjectDocument } from "./components/workspace/FilePanels"
 
 /**
  * Nexus v0.2 shell: projects, chat, execution.
  *
- * All state that matters is server state. The UI never derives a verdict; it renders the run
+ * Agent and project state come from the server; docking state lives in WorkspaceStore. The UI never derives a verdict; it renders the run
  * report and the event stream the API server produced from the core.
  */
 export function App() {
+  const workspace = useWorkspace()
   const [health, setHealth] = useState<HealthResponse>()
   const [models, setModels] = useState<ModelsResponse>()
   const [projects, setProjects] = useState<Project[]>([])
@@ -35,6 +39,7 @@ export function App() {
   const [busy, setBusy] = useState(false)
   const [modelPending, setModelPending] = useState(false)
   const [error, setError] = useState("")
+  const file = useProjectDocument(projectId)
 
   const guard = useCallback(async (work: () => Promise<void>) => {
     setBusy(true)
@@ -102,7 +107,7 @@ export function App() {
   useEffect(() => {
     if (!runId) return
     setEvents([])
-    const state = { live: true }
+    const state: { live: boolean; timer?: ReturnType<typeof setTimeout> } = { live: true }
     const stop = subscribe(
       runId,
       0,
@@ -110,6 +115,13 @@ export function App() {
         if (!state.live) return
         setEvents((current) => [...current, event])
         if (["permission_request", "permission_resolved"].includes(event.type)) void api.run(runId).then(setRun)
+        if (!state.timer && ["state", "tool", "supervisor", "completion"].includes(event.type))
+          state.timer = setTimeout(() => {
+            state.timer = undefined
+            void Promise.all([api.run(runId), api.report(runId)]).then(([summary, currentReport]) => {
+              if (state.live) { setRun(summary); setReport(currentReport) }
+            }).catch(() => {})
+          }, 250)
       },
       () => {
         if (state.live) void settle(runId)
@@ -117,6 +129,7 @@ export function App() {
     )
     return () => {
       state.live = false
+      clearTimeout(state.timer)
       stop()
     }
   }, [runId, epoch, settle])
@@ -148,6 +161,13 @@ export function App() {
     })
 
   const recover = (work: () => Promise<RunReport>) => void guard(async () => setReport(await work()))
+  const answerPermission = (requestId: string, approved: boolean) => void guard(async () => {
+    if (runId) setRun(await api.permission(runId, requestId, approved))
+  })
+  const openFile = (path: string) => {
+    file.open(path)
+    workspace.open("editor", workspace.getSnapshot().model.getNodeById("chat")?.getParent()?.getId())
+  }
 
   return (
     <div className="app">
@@ -169,11 +189,19 @@ export function App() {
           }}
         />
         <span className="spacer" />
+        {run?.pendingPermission && <button className="permission-notice" onClick={() => workspace.open("permissions")}>Approval required</button>}
         {health && <span className="tag">bun {health.bun}</span>}
       </div>
       {error && <div className="error">{error}</div>}
-      <div className="columns">
-        <ProjectsPanel
+      <DockLayout store={workspace} pendingPermission={Boolean(run?.pendingPermission)} renderPanel={(panel) => {
+        if (panel === "timeline") return <TimelinePanel events={events} />
+        if (panel === "logs") return <TimelinePanel events={events} logs />
+        if (panel === "terminal") return <TerminalPanel events={events} />
+        if (panel === "state") return <AgentStatePanel run={run} report={report} />
+        if (panel === "permissions") return <PermissionsPanel run={run} busy={busy} onPermission={answerPermission} />
+        if (panel === "files" || panel === "explorer") return <FileBrowser key={`${panel}-${projectId}`} projectId={projectId} onOpen={openFile} explorer={panel === "explorer"} />
+        if (panel === "editor") return <EditorPanel file={file} />
+        if (panel === "projects") return <ProjectsPanel
           projects={projects}
           selectedId={projectId}
           detail={detail}
@@ -196,7 +224,7 @@ export function App() {
           }
           onOpenTask={openTask}
         />
-        <ChatPanel
+        if (panel === "chat") return <ChatPanel
           projectName={detail?.name}
           settings={detail?.settings}
           run={run}
@@ -209,11 +237,7 @@ export function App() {
               if (runId) await api.prompt(runId, text, delivery)
             })
           }
-          onPermission={(requestId, approved) =>
-            void guard(async () => {
-              if (runId) setRun(await api.permission(runId, requestId, approved))
-            })
-          }
+          onPermission={answerPermission}
           onCancel={() =>
             void guard(async () => {
               if (runId) setRun(await api.cancel(runId))
@@ -221,7 +245,8 @@ export function App() {
           }
           onSaveSettings={saveSettings}
         />
-        <ExecutionView
+        return <ExecutionView
+          view={panel === "execution" ? undefined : panel}
           report={report}
           busy={busy || Boolean(run?.running)}
           onTrustChecks={(note) => recover(() => api.trustChecks(runId!, note))}
@@ -234,7 +259,7 @@ export function App() {
             })
           }
         />
-      </div>
+      }} />
     </div>
   )
 }

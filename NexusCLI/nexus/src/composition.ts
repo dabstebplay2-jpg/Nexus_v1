@@ -14,6 +14,8 @@ import { admit } from "./session/inbox"
 import { defaultBudgets } from "./config/config"
 import { createContract } from "./completion/policy"
 import { inferGoalCheck } from "./completion/infer"
+import { contractMode, resolveIntent } from "./intelligence/intent"
+import type { TrustProfile } from "./intelligence/trust"
 import { detect } from "./project/detect"
 import { gitBaseline } from "./git/baseline"
 import { agentChanges } from "./git/changes"
@@ -36,6 +38,7 @@ export async function createNexus(options: {
   provider?: Provider
   store?: Store
   rules?: Rules
+  trust?: TrustProfile
   sandbox?: SandboxProvider
   permission?: PermissionReply
   onEvent?: EventSink
@@ -46,7 +49,8 @@ export async function createNexus(options: {
   // The only execution backend Phase 0 ships. It reports honestly that it isolates nothing;
   // a container or job-object provider can replace it here alone.
   const sandbox = options.sandbox ?? new LocalSandboxProvider()
-  const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission), sandbox)
+  const trust = options.trust ? { ...options.trust, workspace: await realpath(options.trust.workspace) } : undefined
+  const executor = new ToolExecutor(store, new PermissionEngine(options.rules, options.permission, trust), sandbox)
   const verification = new VerificationEngine(store, executor)
   const registry = new ToolRegistry()
   builtinTools().forEach((tool) => registry.register(tool))
@@ -115,8 +119,11 @@ export async function createNexus(options: {
       const workspace = await realpath(input.workspace)
       if (!input.goal.trim()) throw new NexusError("INPUT", "A goal is required")
       const project = await detect(workspace)
-      const goalCheck = input.goalCheck ?? (input.mode === "answer" ? undefined : await inferGoalCheck(workspace, input.goal))
-      const contract = createContract(redact(input.goal), project, input.mode ?? "coding", goalCheck)
+      // An explicit trusted check must remain executable, including for explanatory goals.
+      const intent = resolveIntent(input.goal, input.mode ?? (input.goalCheck ? "coding" : undefined))
+      const mode = input.mode ?? contractMode(intent)
+      const goalCheck = input.goalCheck ?? (mode === "answer" ? undefined : await inferGoalCheck(workspace, input.goal))
+      const contract = createContract(redact(input.goal), project, mode, goalCheck)
       contract.trustManifest = await establishTrust(
         workspace,
         contract.checks.map((check) => check.argv),
@@ -144,6 +151,7 @@ export async function createNexus(options: {
         toolCount: 0,
         activeMs: 0,
         contract,
+        intent,
         project,
         baseline: await gitBaseline(workspace),
         errors: [],
@@ -161,6 +169,7 @@ export async function createNexus(options: {
         model: session.model.model,
         branch: session.baseline.branch,
         contract,
+        intent,
       })
       return session
     },

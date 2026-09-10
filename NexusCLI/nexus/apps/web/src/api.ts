@@ -11,6 +11,8 @@ import type {
   RunReport,
   RunSummary,
   StreamEvent,
+  WorkspaceDirectory,
+  WorkspaceFile,
 } from "../../shared/protocol"
 
 /** Every call goes to the Nexus API server; the UI holds no agent logic of its own. */
@@ -37,6 +39,8 @@ export const api = {
   projects: () => request<Project[]>("/projects"),
   addProject: (path: string) => request<ProjectDetail>("/projects", "POST", { path }),
   project: (id: string) => request<ProjectDetail>(`/projects/${id}`),
+  directory: (id: string, path = ".") => request<WorkspaceDirectory>(`/projects/${id}/files?path=${encodeURIComponent(path)}`),
+  file: (id: string, path: string) => request<WorkspaceFile>(`/projects/${id}/file?path=${encodeURIComponent(path)}`),
   saveProject: (id: string, patch: ProjectPatch) => request<ProjectDetail>(`/projects/${id}`, "PATCH", patch),
   removeProject: (id: string) => request<{ removed: string }>(`/projects/${id}`, "DELETE"),
   runs: () => request<RunSummary[]>("/runs"),

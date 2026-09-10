@@ -135,6 +135,18 @@ export type GitBaseline = {
   untracked: string
   available: boolean
 }
+export type TaskType = "ANALYSIS" | "DEBUG" | "FEATURE" | "REFACTOR" | "AUDIT"
+export type ExecutionMode = "READ_ONLY" | "MUTATING"
+export type TaskIntent = {
+  type: TaskType
+  execution: ExecutionMode
+  mutationAllowed: boolean
+  verificationRequired: boolean
+  allowedTools: string[]
+  workflow: string[]
+  confidence: "high" | "low"
+  reason: string
+}
 export type AgentSession = {
   id: string
   workspace: string
@@ -155,6 +167,7 @@ export type AgentSession = {
   toolCount: number
   activeMs: number
   contract: Contract
+  intent?: TaskIntent
   project: Project
   baseline: GitBaseline
   errors: string[]
